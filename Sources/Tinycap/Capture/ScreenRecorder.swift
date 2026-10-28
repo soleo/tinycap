@@ -1,5 +1,6 @@
 import AVFoundation
 import ScreenCaptureKit
+import os
 import TinycapCore
 
 /// What to record, resolved to ScreenCaptureKit objects.
@@ -48,6 +49,7 @@ final class ScreenRecorder: NSObject {
         target: CaptureTarget,
         settings: RecordingSettings,
         excludingApp ownApp: SCRunningApplication?,
+        includingOwnWindows ownWindows: [SCWindow] = [],
         outputURL: URL
     ) async throws {
         guard stream == nil else { throw RecorderError.alreadyRecording }
@@ -55,7 +57,9 @@ final class ScreenRecorder: NSObject {
         let filter: SCContentFilter
         switch target {
         case .display(let display), .area(let display, _):
-            filter = SCContentFilter(display: display, excludingApplications: ownApp.map { [$0] } ?? [], exceptingWindows: [])
+            filter = SCContentFilter(display: display, excludingApplications: ownApp.map { [$0] } ?? [],
+                                  // Exceptions only apply to excluded apps; with none, ours are captured anyway.
+                                  exceptingWindows: ownApp == nil ? [] : ownWindows)
         case .window(let window):
             filter = SCContentFilter(desktopIndependentWindow: window)
         }
@@ -74,6 +78,9 @@ final class ScreenRecorder: NSObject {
         config.height = pixels.height
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.frameRate.rawValue))
         config.showsCursor = settings.showsCursor
+        // Screen and area recordings get Tinycap's own click rings (ClickHighlighter).
+        // A single window is captured on its own, so it relies on the system's drawing.
+        if case .window = target { config.showMouseClicks = settings.highlightsClicks }
         config.capturesAudio = false
         config.captureResolution = settings.captureAtNativeScale ? .best : .nominal
         config.queueDepth = 6
@@ -84,6 +91,8 @@ final class ScreenRecorder: NSObject {
         guard recordingConfig.availableVideoCodecTypes.contains(.h264) else { throw RecorderError.codecUnavailable }
         recordingConfig.videoCodecType = .h264
 
+        Logger(subsystem: "app.tinycap.Tinycap", category: "recording").notice(
+            "stream start: own windows included \(ownWindows.map(\.windowID), privacy: .public), excluding own app \(ownApp != nil, privacy: .public), showMouseClicks \(config.showMouseClicks, privacy: .public)")
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         let output = SCRecordingOutput(configuration: recordingConfig, delegate: self)
         try stream.addRecordingOutput(output)

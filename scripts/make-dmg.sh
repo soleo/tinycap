@@ -4,6 +4,7 @@
 #   2. DMG with the app and an Applications shortcut, signed
 #   3. notarized with notarytool and stapled, so it opens offline without warnings
 #   4. Gatekeeper check and SHA-256 (for the Homebrew cask)
+#   5. Sparkle appcast.xml signed with the EdDSA key (scripts/make-appcast.sh)
 #
 # Release:
 #   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -18,7 +19,7 @@
 #     --apple-id you@example.com --team-id TEAMID --password <app-specific password>
 #   (With 1Password: `op run -- xcrun notarytool store-credentials …` using op:// references.)
 #
-# Other variables: VERSION (default: latest git tag, else 0.1.0), BUILD_NUMBER
+# Other variables: VERSION (default: the VERSION file), BUILD_NUMBER
 # (default: commit count), BUNDLE_ID, ALLOW_PORTABLE_VPX=1 to release without nasm.
 set -euo pipefail
 
@@ -36,10 +37,7 @@ die() { echo "error: $*" >&2; exit 1; }
 step() { echo "==> $*"; }
 
 # --- Version -----------------------------------------------------------------
-if [[ -z "${VERSION:-}" ]]; then
-  VERSION="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)"
-  VERSION="${VERSION:-0.1.0}"
-fi
+VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || die "VERSION must look like 1.2 or 1.2.3 (got '$VERSION')"
 
@@ -54,6 +52,8 @@ else
   # Capture first: `cmd | grep -q` under pipefail fails when grep exits before cmd finishes.
   identities="$(security find-identity -v -p codesigning)"
   [[ "$identities" == *"\"$SIGN_IDENTITY\""* ]] || die "identity not found in your keychain: $SIGN_IDENTITY"
+  [[ -s "$ROOT/Resources/sparkle-public-key.txt" ]] \
+    || die "no Sparkle key: run scripts/make-appcast.sh --setup-key and commit Resources/sparkle-public-key.txt"
   [[ -n "${NOTARY_PROFILE:-}" ]] || die "set NOTARY_PROFILE to a notarytool keychain profile (see the header of this script)"
   if [[ "${ALLOW_PORTABLE_VPX:-0}" != "1" ]] && ! command -v nasm >/dev/null && ! command -v yasm >/dev/null; then
     die "nasm not found: the Intel build of libvpx would be slow. Run 'brew install nasm', or set ALLOW_PORTABLE_VPX=1"
@@ -70,7 +70,7 @@ mkdir -p "$OUT"
 
 # --- 1. App ----------------------------------------------------------------------
 step "Building Tinycap $VERSION ($BUILD_NUMBER), universal release"
-CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" SIGN_IDENTITY="$SIGN_IDENTITY" \
+CHANNEL=direct CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" SIGN_IDENTITY="$SIGN_IDENTITY" \
   "$ROOT/scripts/build-app.sh"
 
 archs="$(xcrun lipo -archs "$APP/Contents/MacOS/Tinycap")"
@@ -128,7 +128,12 @@ echo
 echo "==> $DMG ($SIZE)"
 echo "    sha256 $SHA"
 if [[ "$UNSIGNED" == "0" ]]; then
+  # --- 5. Appcast ------------------------------------------------------------------
+  step "Signing the update feed"
+  "$ROOT/scripts/make-appcast.sh" "$DMG" "$VERSION" "$BUILD_NUMBER"
   echo
-  echo "Publish:"
-  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' --title 'Tinycap $VERSION' --generate-notes"
+  echo "Publish (the appcast must be on the latest release for the in-app updater):"
+  notes="$ROOT/ReleaseNotes/$VERSION.md"
+  if [[ -s "$notes" ]]; then notes_flag="--notes-file '$notes'"; else notes_flag="--generate-notes"; fi
+  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --title 'Tinycap $VERSION' $notes_flag"
 fi

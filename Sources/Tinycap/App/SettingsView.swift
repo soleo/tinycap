@@ -30,6 +30,8 @@ struct SettingsView: View {
                 .tabItem { Label("Recording", systemImage: "record.circle") }
             ExportSettingsView()
                 .tabItem { Label("Export", systemImage: "square.and.arrow.up") }
+            AboutSettingsView()
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
@@ -76,6 +78,8 @@ private struct GeneralSettingsView: View {
                 }
             }
 
+            UpdateSettingsSection()
+
             Section {
                 ForEach(ShortcutAction.allCases, id: \.self) { action in
                     LabeledContent(action.title) {
@@ -92,12 +96,6 @@ private struct GeneralSettingsView: View {
                     Spacer()
                     Button("Reset to Defaults") { ShortcutManager.shared.resetAll() }
                         .controlSize(.small)
-                }
-            }
-
-            Section {
-                LabeledContent("Tinycap is open source under the MIT license.") {
-                    Button("Acknowledgements…") { AcknowledgementsWindowController.shared.show() }
                 }
             }
         }
@@ -123,10 +121,61 @@ private struct GeneralSettingsView: View {
     }
 }
 
+/// UP-5: "Check for updates daily" (on by default), Check Now and the last-checked time.
+struct UpdateSettingsSection: View {
+    @State private var updates = UpdateController.shared
+
+    var body: some View {
+        if updates.isAvailable { controls } else {
+            Section("Updates") {
+                Text("This build of Tinycap can't check for updates.").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        Section {
+            Toggle("Check for updates daily", isOn: Binding(
+                get: { updates.checksEnabled },
+                set: { updates.checksEnabled = $0 }
+            ))
+            LabeledContent("Last checked") {
+                HStack {
+                    Text(Self.lastCheckText(updates)).foregroundStyle(.secondary)
+                    Button(updates.isChecking ? "Checking…" : "Check Now") { updates.checkNow() }
+                        .disabled(updates.isChecking)
+                }
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text(footer)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var footer: String {
+        #if SPARKLE
+        "The only network request Tinycap makes. It fetches the release list from GitHub; nothing about you or this Mac is sent."
+        #else
+        "The only network request Tinycap makes. It asks the App Store for the latest version number; nothing about you or this Mac is sent."
+        #endif
+    }
+
+    static func lastCheckText(_ updates: UpdateController) -> String {
+        guard let date = updates.lastCheck else { return "Never" }
+        let when = date.formatted(.relative(presentation: .named))
+        return updates.lastCheckFailed ? "\(when) (failed)" : when
+    }
+}
+
 private struct RecordingSettingsView: View {
     @AppStorage(PreferenceKey.frameRate) private var frameRate = FrameRate.default.rawValue
     @AppStorage(PreferenceKey.showsCursor) private var showsCursor = true
     @AppStorage(PreferenceKey.captureAtNativeScale) private var nativeScale = true
+    @AppStorage(PreferenceKey.highlightsClicks) private var highlightsClicks = false
+    @AppStorage(PreferenceKey.countdown) private var countdown = false
 
     var body: some View {
         Form {
@@ -136,12 +185,105 @@ private struct RecordingSettingsView: View {
                 }
             }
             Toggle("Show cursor", isOn: $showsCursor)
+            Toggle("Highlight clicks", isOn: $highlightsClicks)
+            Toggle("Count down 3-2-1 before recording", isOn: $countdown)
             Toggle("Record at Retina resolution", isOn: $nativeScale)
             Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct AboutSettingsView: View {
+    @State private var copied = false
+    private let info = Diagnostics.current
+
+    var body: some View {
+        Form {
+            HStack(spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tinycap").font(.title2.weight(.semibold))
+                    Text("Version \(info.appVersion) (\(info.build))")
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(.vertical, 4)
+
+            Section {
+                if let date = info.buildDate {
+                    LabeledContent("Built", value: date.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let commit = info.commit {
+                    LabeledContent("Commit") {
+                        if let url = Diagnostics.commitURL {
+                            Link(commit, destination: url).font(.body.monospaced())
+                        } else {
+                            Text(commit).font(.body.monospaced()).textSelection(.enabled)
+                        }
+                    }
+                }
+                LabeledContent("Installed from", value: info.channel == .appStore ? "App Store" : "Direct download")
+                if UpdateController.shared.isAvailable { LabeledContent("Last update check") {
+                    HStack {
+                        Text(UpdateSettingsSection.lastCheckText(UpdateController.shared))
+                            .foregroundStyle(.secondary)
+                        Button("Check for Updates") { UpdateController.shared.checkNow() }
+                            .disabled(UpdateController.shared.isChecking)
+                    }
+                } }
+            }
+
+            Section("Links") {
+                links
+            }
+
+            Section {
+                HStack {
+                    Button("Report a Bug…") { Diagnostics.open(.bug) }
+                    Button("Send Feedback…") { Diagnostics.open(.feature) }
+                    Spacer()
+                    Button(copied ? "Copied" : "Copy Diagnostics") {
+                        Diagnostics.copyToPasteboard()
+                        copied = true
+                    }
+                }
+                .disabled(Diagnostics.repositoryURL == nil)
+            } footer: {
+                Text("Report and feedback open GitHub in your browser with your Tinycap and macOS versions filled in. Tinycap sends nothing itself. Copy Diagnostics adds the last error, for pasting into an issue.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Tinycap is open source under the MIT license.") {
+                    Button("Acknowledgements…") { AcknowledgementsWindowController.shared.show() }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder private var links: some View {
+        let items: [(String, URL?)] = [
+            ("Xinjiang Shao", Diagnostics.authorURL),
+            ("@soleo on GitHub", Diagnostics.authorGitHubURL),
+            ("Source code", Diagnostics.repositoryURL),
+            ("Release notes", Diagnostics.releaseNotesURL),
+        ]
+        ForEach(items.compactMap { title, url in url.map { (title, $0) } }, id: \.0) { title, url in
+            LabeledContent(title) {
+                Link(url.host().map { $0 + url.path() } ?? url.absoluteString, destination: url)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
     }
 }
 

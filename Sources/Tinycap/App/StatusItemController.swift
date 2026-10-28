@@ -18,6 +18,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         coordinator.onStateChange = { [weak self] state in self?.apply(state) }
+        UpdateController.shared.onChange = { [weak self] in
+            guard let self else { return }
+            self.apply(self.coordinator.state)
+        }
         apply(coordinator.state)
     }
 
@@ -32,11 +36,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         case .idle, .selecting:
             statusItem.menu = menu
             button.action = nil
-            button.image = MenuBarIcon.idle
+            let update = UpdateController.shared.available
+            button.image = update == nil ? MenuBarIcon.idle : MenuBarIcon.idleWithUpdate
             button.imagePosition = .imageOnly
             button.title = ""
-            button.toolTip = "Tinycap"
-            button.setAccessibilityLabel("Tinycap")
+            button.toolTip = update.map { "Tinycap — version \($0.version) is available" } ?? "Tinycap"
+            button.setAccessibilityLabel(update == nil ? "Tinycap" : "Tinycap, update available")
 
         case .recording(let startedAt):
             statusItem.menu = nil
@@ -86,6 +91,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let busy = coordinator.state != .idle
 
+        if let update = UpdateController.shared.available {
+            let item = NSMenuItem(title: "Update to Tinycap \(update.version)…", action: #selector(showUpdate), keyEquivalent: "")
+            item.target = self
+            item.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
+
         for (action, mode) in [(ShortcutAction.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
             let combo = ShortcutManager.shared.combo(for: action)
             let item = NSMenuItem(title: action.title, action: #selector(record(_:)), keyEquivalent: combo?.menuKeyEquivalent ?? "")
@@ -109,6 +122,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
+        menu.addItem(.separator())
+        let bug = NSMenuItem(title: "Report a Bug…", action: #selector(reportBug), keyEquivalent: "")
+        bug.target = self
+        menu.addItem(bug)
+        let feedback = NSMenuItem(title: "Send Feedback…", action: #selector(sendFeedback), keyEquivalent: "")
+        feedback.target = self
+        menu.addItem(feedback)
+        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Tinycap", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
     }
@@ -160,6 +181,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func clearRecents() {
         RecentRecordings.clear()
+    }
+
+    @objc private func showUpdate() {
+        UpdateController.shared.showUpdate()
+    }
+
+    @objc private func reportBug() {
+        Diagnostics.open(.bug)
+    }
+
+    @objc private func sendFeedback() {
+        Diagnostics.open(.feature)
     }
 
     @objc private func showSettings() {

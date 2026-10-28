@@ -30,6 +30,16 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License. Tinycap contributors.</string>
+	<key>TinycapRepositoryURL</key>
+	<string>https://github.com/soleo/tinycap</string>
+	<key>TinycapAuthorURL</key>
+	<string>https://xinjiangshao.com/</string>
+	<key>TinycapAuthorGitHubURL</key>
+	<string>https://github.com/soleo</string>
+	<key>TCBuildDate</key>
+	<string>$(BUILD_DATE)</string>
+	<key>TCGitCommit</key>
+	<string>$(GIT_COMMIT)</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

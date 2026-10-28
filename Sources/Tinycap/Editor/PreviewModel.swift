@@ -91,6 +91,7 @@ final class PreviewModel {
             phase = .ready
             scheduleEstimate(delay: .zero)
         } catch {
+            Diagnostics.record(error, context: "Open recording")
             phase = .failed("This recording can't be opened: \(error.localizedDescription)")
         }
     }
@@ -298,6 +299,7 @@ final class PreviewModel {
         do {
             destination = try SaveLocation.shared.nextDestination(pathExtension: exporter.fileExtension)
         } catch {
+            Diagnostics.record(error, context: "Save folder")
             phase = .failed("Can't write to the save folder: \(error.localizedDescription)")
             return
         }
@@ -323,6 +325,7 @@ final class PreviewModel {
             } catch is CancellationError {
                 phase = .ready
             } catch {
+                Diagnostics.record(error, context: "Export \(exporter.fileExtension)")
                 phase = .failed(error.localizedDescription)
             }
         }
