@@ -25,7 +25,9 @@ WEBM_SHA256=616cfdca1c869222dc60d5a49d112c1464040390e3876afca4d385347c6ce55e
 
 ARCHS="${ARCHS:-arm64 x86_64}"
 STAMP="$VENDOR/.stamp"
-WANT="vpx=$VPX_VERSION webm=$WEBM_VERSION archs=$ARCHS min=$MIN_MACOS"
+# Whether the x86_64 slice gets SIMD; installing nasm later triggers a rebuild.
+if command -v nasm >/dev/null || command -v yasm >/dev/null; then X86_ASM=yes; else X86_ASM=no; fi
+WANT="vpx=$VPX_VERSION webm=$WEBM_VERSION archs=$ARCHS min=$MIN_MACOS x86asm=$X86_ASM"
 if [[ -f "$STAMP" && "$(cat "$STAMP")" == "$WANT" && "${FORCE:-0}" != "1" ]]; then
   echo "==> Vendor libraries up to date ($WANT)"
   exit 0
