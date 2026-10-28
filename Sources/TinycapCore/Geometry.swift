@@ -64,6 +64,25 @@ public enum Geometry {
         return r
     }
 
+    /// The capture region for a window on its display, in the display-local, top-left
+    /// points `sourceRect` expects. Both frames are Core Graphics global coordinates
+    /// (`SCWindow.frame`, `SCDisplay.frame`). A window partly off the display is shifted
+    /// back inside, keeping its size, so the video size never changes mid-recording.
+    public static func windowSourceRect(window: CGRect, display: CGRect) -> CGRect {
+        let local = window.offsetBy(dx: -display.minX, dy: -display.minY)
+        return keep(local, inside: CGRect(origin: .zero, size: display.size))
+    }
+
+    /// The display holding most of `window` (CG global coordinates), else the first one.
+    public static func bestDisplayIndex(for window: CGRect, displays: [CGRect]) -> Int? {
+        guard !displays.isEmpty else { return nil }
+        let areas = displays.map { d -> CGFloat in
+            let i = d.intersection(window)
+            return i.isNull ? 0 : i.width * i.height
+        }
+        return areas.indices.max { areas[$0] < areas[$1] }
+    }
+
     /// Output pixel size for a capture of `pointSize` at `scale`. Video encoders need
     /// even dimensions, so each side is rounded down to an even number (minimum 2).
     public static func pixelSize(for pointSize: CGSize, scale: CGFloat) -> (width: Int, height: Int) {

@@ -9,6 +9,9 @@ enum CaptureTarget {
     /// `rect` is in the display's local, top-left-origin points.
     case area(SCDisplay, rect: CGRect)
     case window(SCWindow)
+    /// One window, captured as its region of the display so Tinycap's click overlay can
+    /// be drawn over it. `rect` is display-local, top-left points; it follows the window.
+    case windowRegion(SCWindow, on: SCDisplay, rect: CGRect)
 }
 
 enum RecorderError: LocalizedError {
@@ -36,6 +39,7 @@ final class ScreenRecorder: NSObject {
     var onUnexpectedStop: ((Error?) -> Void)?
 
     private var stream: SCStream?
+    private var configuration: SCStreamConfiguration?
     private var recordingOutput: SCRecordingOutput?
     private var outputURL: URL?
     private var finishContinuation: CheckedContinuation<Void, Error>?
@@ -62,15 +66,19 @@ final class ScreenRecorder: NSObject {
                                   exceptingWindows: ownApp == nil ? [] : ownWindows)
         case .window(let window):
             filter = SCContentFilter(desktopIndependentWindow: window)
+        case .windowRegion(let window, let display, _):
+            // Only the chosen window and Tinycap's overlay; nothing else on the display.
+            filter = SCContentFilter(display: display, including: [window] + ownWindows)
         }
 
         let scale = settings.captureAtNativeScale ? CGFloat(filter.pointPixelScale) : 1
         let config = SCStreamConfiguration()
         let pointSize: CGSize
-        if case .area(_, let rect) = target {
+        switch target {
+        case .area(_, let rect), .windowRegion(_, _, let rect):
             config.sourceRect = rect
             pointSize = rect.size
-        } else {
+        default:
             pointSize = filter.contentRect.size
         }
         let pixels = Geometry.pixelSize(for: pointSize, scale: scale)
@@ -78,9 +86,6 @@ final class ScreenRecorder: NSObject {
         config.height = pixels.height
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.frameRate.rawValue))
         config.showsCursor = settings.showsCursor
-        // Screen and area recordings get Tinycap's own click rings (ClickHighlighter).
-        // A single window is captured on its own, so it relies on the system's drawing.
-        if case .window = target { config.showMouseClicks = settings.highlightsClicks }
         config.capturesAudio = false
         config.captureResolution = settings.captureAtNativeScale ? .best : .nominal
         config.queueDepth = 6
@@ -92,12 +97,13 @@ final class ScreenRecorder: NSObject {
         recordingConfig.videoCodecType = .h264
 
         Logger(subsystem: "app.tinycap.Tinycap", category: "recording").notice(
-            "stream start: own windows included \(ownWindows.map(\.windowID), privacy: .public), excluding own app \(ownApp != nil, privacy: .public), showMouseClicks \(config.showMouseClicks, privacy: .public)")
+            "stream start: own windows included \(ownWindows.map(\.windowID), privacy: .public), excluding own app \(ownApp != nil, privacy: .public), source \(String(describing: config.sourceRect), privacy: .public)")
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         let output = SCRecordingOutput(configuration: recordingConfig, delegate: self)
         try stream.addRecordingOutput(output)
 
         self.stream = stream
+        self.configuration = config
         self.recordingOutput = output
         self.outputURL = outputURL
         isStopping = false
@@ -107,6 +113,14 @@ final class ScreenRecorder: NSObject {
             reset()
             throw error
         }
+    }
+
+    /// Moves the captured region (window-region recordings follow their window).
+    /// The output size stays the same, so the video doesn't change shape.
+    func moveSource(to rect: CGRect) async {
+        guard let stream, let configuration, !isStopping, configuration.sourceRect != rect else { return }
+        configuration.sourceRect = rect
+        try? await stream.updateConfiguration(configuration)
     }
 
     /// Stops capture and waits until the master file is finalized on disk.
@@ -146,6 +160,7 @@ final class ScreenRecorder: NSObject {
 
     private func reset() {
         stream = nil
+        configuration = nil
         recordingOutput = nil
         outputURL = nil
         isStopping = false

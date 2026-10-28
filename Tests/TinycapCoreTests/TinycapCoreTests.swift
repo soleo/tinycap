@@ -136,3 +136,30 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(list.paths, ["d", "a", "c"])
     }
 }
+
+final class WindowRegionTests: XCTestCase {
+    private let primary = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    private let external = CGRect(x: 1512, y: -200, width: 2560, height: 1440)
+
+    func testWindowOnPrimary() {
+        XCTAssertEqual(Geometry.windowSourceRect(window: CGRect(x: 100, y: 50, width: 800, height: 600), display: primary),
+                       CGRect(x: 100, y: 50, width: 800, height: 600))
+    }
+
+    func testWindowOnExternalDisplayIsMadeLocal() {
+        XCTAssertEqual(Geometry.windowSourceRect(window: CGRect(x: 1612, y: -100, width: 800, height: 600), display: external),
+                       CGRect(x: 100, y: 100, width: 800, height: 600))
+    }
+
+    func testWindowPartlyOffscreenIsShiftedBackKeepingSize() {
+        XCTAssertEqual(Geometry.windowSourceRect(window: CGRect(x: -50, y: 700, width: 800, height: 600), display: primary),
+                       CGRect(x: 0, y: 382, width: 800, height: 600))
+    }
+
+    func testBestDisplayIsTheOneWithMostOfTheWindow() {
+        let window = CGRect(x: 1400, y: 100, width: 800, height: 600) // mostly on the external display
+        XCTAssertEqual(Geometry.bestDisplayIndex(for: window, displays: [primary, external]), 1)
+        XCTAssertEqual(Geometry.bestDisplayIndex(for: CGRect(x: 100, y: 100, width: 10, height: 10), displays: [primary, external]), 0)
+        XCTAssertNil(Geometry.bestDisplayIndex(for: window, displays: []))
+    }
+}
