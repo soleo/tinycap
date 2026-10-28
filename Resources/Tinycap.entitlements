@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Same entitlements for the App Store and direct builds. No network, no microphone. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
+	<!-- Default save folder is ~/Movies/Tinycap. Inside the sandbox ~/Movies is a link to
+	     the real folder, which needs this entitlement to write to. -->
+	<key>com.apple.security.assets.movies.read-write</key>
+	<true/>
+</dict>
+</plist>
