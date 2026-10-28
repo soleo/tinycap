@@ -1,29 +1,53 @@
 import AVFoundation
+import TinycapCore
+
+/// What to export from a master recording.
+struct ExportOptions: Sendable {
+    /// Part of the master to keep; nil exports all of it.
+    var timeRange: CMTimeRange?
+    var settings: ExportSettings
+}
 
 /// Turns the master .mov into a shareable file. One type per format (MP4 now;
 /// GIF in M3, WebM in M4).
 protocol Exporter: Sendable {
     var fileExtension: String { get }
-    func export(master: URL, timeRange: CMTimeRange?, to destination: URL) async throws
+    func export(
+        master: URL,
+        options: ExportOptions,
+        to destination: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws
 }
 
 enum ExportError: LocalizedError {
-    case cannotCreateSession
-    var errorDescription: String? { "Tinycap couldn't prepare the video for export." }
+    case noVideoTrack
+    case cannotEncode(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .noVideoTrack: return "The recording has no video."
+        case .cannotEncode(let reason): return "Tinycap couldn't encode the video: \(reason)"
+        }
+    }
 }
 
-/// MP4 export. The master is already H.264, so this remuxes without re-encoding
-/// (fast, lossless). Quality and scale controls arrive with M2 and will re-encode.
-struct MP4Exporter: Exporter {
-    let fileExtension = "mp4"
+/// Facts about a master recording, loaded once for the preview and estimates.
+struct MasterInfo: Sendable {
+    let duration: Double
+    /// Encoded pixel size of the video track.
+    let pixelSize: CGSize
+    let frameRate: Double
 
-    func export(master: URL, timeRange: CMTimeRange? = nil, to destination: URL) async throws {
-        let asset = AVURLAsset(url: master)
-        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
-            throw ExportError.cannotCreateSession
-        }
-        session.shouldOptimizeForNetworkUse = true // moov atom first, so it plays while loading in Slack/GitHub
-        if let timeRange { session.timeRange = timeRange }
-        try await session.export(to: destination, as: .mp4)
+    static func load(_ url: URL) async throws -> MasterInfo {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw ExportError.noVideoTrack }
+        let (size, fps) = try await track.load(.naturalSize, .nominalFrameRate)
+        let duration = try await asset.load(.duration)
+        return MasterInfo(
+            duration: max(duration.seconds.isFinite ? duration.seconds : 0, 0),
+            pixelSize: size,
+            frameRate: fps > 0 ? Double(fps) : 30
+        )
     }
 }

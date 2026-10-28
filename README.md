@@ -6,20 +6,29 @@ Requires macOS 15 Sequoia or later. MIT licensed.
 
 ## Status
 
-Milestone 1 (capture) is in place:
+Milestones 1 (capture) and 2 (preview and MP4 export) are in place.
 
-- Menu-bar app with no Dock icon: Record Window, Record Screen, Record Area, Open Recent, Settings, Quit
+**Capture**
+- Menu-bar app with no Dock icon: Record Window, Record Screen, Record Area, Open Recent, Settings, Quit. Opening the app again while it runs shows a small window with the record buttons.
 - Area mode: dimmed overlay on every display, drag a rectangle, live W × H in points, move/resize handles, Return to record, Esc to cancel, floating bar with frame rate and cursor toggles
 - Window mode: hover highlights the window under the cursor, click to record; keeps recording when the window moves
 - Screen mode: picks the display straight away, or lets you click one when there are several
-- Recording with ScreenCaptureKit (`SCRecordingOutput`) to an H.264 master, 15/30/60 fps, Retina or 1×, cursor on/off
-- While recording the menu-bar icon shows the elapsed time; click it to stop
-- On stop the clip is saved as MP4 (no re-encode) and revealed in Finder
-- Global shortcuts: ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop
-- First-run window that explains and requests the Screen Recording permission
-- Settings: launch at login, save folder, file name pattern, frame rate, cursor, Retina
+- ScreenCaptureKit (`SCRecordingOutput`) writes an H.264 master; 15/30/60 fps, Retina or 1×, cursor on/off
+- While recording, the menu-bar icon shows the elapsed time; click it to stop
 
-Next (see the PRD milestones): preview window with trim, MP4 quality and scale, editable shortcuts (M2); GIF export (M3); WebM export (M4); countdown, click highlights and release packaging (M5).
+**Preview and export**
+- On stop, a preview window plays the clip
+- Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
+- MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
+- After export: Copy (paste the file into Slack, Mail, Finder), Show in Finder, or drag the file out
+- Closing an unexported recording asks first; recordings left by a quit or crash are offered again at the next launch
+
+**Settings**
+- General: launch at login, save folder, file name pattern, editable global shortcuts (defaults ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop)
+- Recording: frame rate, cursor, Retina
+- Export: codec, quality and size the preview starts with
+
+Next: GIF export (M3), WebM export (M4), countdown, click highlights and release packaging (M5).
 
 ## Build
 
@@ -27,6 +36,7 @@ Next (see the PRD milestones): preview window with trim, MP4 quality and scale, 
 scripts/build-app.sh            # release, universal (arm64 + x86_64) → build/Tinycap.app
 CONFIG=debug scripts/build-app.sh
 scripts/test.sh                 # unit tests for TinycapCore
+scripts/export-check.sh         # encodes a synthetic recording: trim, scale, codecs, file size, cancel
 open build/Tinycap.app
 ```
 
@@ -60,9 +70,10 @@ The script removes the light backdrop around the tile, centers it on Apple's 824
 | `Sources/Tinycap/App` | Entry point, menu-bar item, settings, onboarding, save folder |
 | `Sources/Tinycap/Selection` | Area, window and screen pickers; recording outline |
 | `Sources/Tinycap/Capture` | `ScreenRecorder` (ScreenCaptureKit) |
-| `Sources/Tinycap/Recording` | `RecordingCoordinator`: select → record → stop → save |
-| `Sources/Tinycap/Export` | `Exporter` protocol and the MP4 exporter |
-| `Sources/Tinycap/Hotkeys` | Global shortcuts via Carbon `RegisterEventHotKey` |
+| `Sources/Tinycap/Recording` | `RecordingCoordinator`: select → record → stop → preview |
+| `Sources/Tinycap/Editor` | Preview window: player, trim scrubber, export controls |
+| `Sources/Tinycap/Export` | `Exporter` protocol and the MP4 exporter (AVAssetReader → AVAssetWriter) |
+| `Sources/Tinycap/Hotkeys` | Global shortcuts via Carbon `RegisterEventHotKey`, shortcut recorder |
 | `Resources` | Info.plist, entitlements, icon |
 
 ## Privacy

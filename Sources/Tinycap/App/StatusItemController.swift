@@ -44,7 +44,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.action = #selector(stopClicked)
             button.image = MenuBarIcon.recording
             button.imagePosition = .imageLeading
-            button.toolTip = "Click to stop recording (\(Shortcut.stop.hotKey.displayString))"
+            let stopKey = ShortcutManager.shared.combo(for: .stop).map { " (\($0.displayString))" } ?? ""
+            button.toolTip = "Click to stop recording\(stopKey)"
             updateElapsed(since: startedAt)
             timerTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -53,13 +54,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 }
             }
 
-        case .saving:
+        case .saving: // finishing the master file; the preview opens next
             statusItem.menu = nil
             button.action = nil
             button.image = MenuBarIcon.idle
             button.imagePosition = .imageLeading
-            button.attributedTitle = Self.timerTitle("Saving…")
-            button.setAccessibilityLabel("Tinycap is saving the recording")
+            button.attributedTitle = Self.timerTitle("Finishing…")
+            button.setAccessibilityLabel("Tinycap is finishing the recording")
         }
     }
 
@@ -85,9 +86,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let busy = coordinator.state != .idle
 
-        for (shortcut, mode) in [(Shortcut.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
-            let item = NSMenuItem(title: shortcut.title, action: #selector(record(_:)), keyEquivalent: shortcut.hotKey.keyEquivalent)
-            item.keyEquivalentModifierMask = shortcut.hotKey.modifiers
+        for (action, mode) in [(ShortcutAction.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
+            let combo = ShortcutManager.shared.combo(for: action)
+            let item = NSMenuItem(title: action.title, action: #selector(record(_:)), keyEquivalent: combo?.menuKeyEquivalent ?? "")
+            if let combo, combo.menuKeyEquivalent != nil {
+                item.keyEquivalentModifierMask = combo.eventModifierFlags
+            } else if let combo {
+                item.toolTip = combo.displayString
+            }
             item.representedObject = mode.rawValue
             item.target = self
             item.isEnabled = !busy
