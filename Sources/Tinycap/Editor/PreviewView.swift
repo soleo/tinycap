@@ -137,10 +137,21 @@ struct PreviewView: View {
             if let size = model.outputSize {
                 Text("\(size.width) × \(size.height) px")
             }
-            if let bytes = model.estimatedBytes {
+            switch model.estimate {
+            case .none, .unavailable:
+                EmptyView()
+            case .estimating(let previous):
+                Text("·").foregroundStyle(.tertiary)
+                if let previous {
+                    Text("about \(ByteSize.format(previous))").opacity(0.5)
+                } else {
+                    Text("estimating size…")
+                }
+                ProgressView().controlSize(.mini)
+            case .bytes(let bytes):
                 Text("·").foregroundStyle(.tertiary)
                 Text("about \(ByteSize.format(bytes))")
-                    .help("Estimate for the kept range. Mostly static screens come out smaller.")
+                    .help("Estimated from a 2-second sample of the kept range at these settings.")
             }
         }
         .monospacedDigit()

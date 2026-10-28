@@ -12,6 +12,9 @@ struct ExportOptions: Sendable {
 /// GIF in M3, WebM in M4).
 protocol Exporter: Sendable {
     var fileExtension: String { get }
+    /// Length of each piece the size estimator encodes. For video codecs this is the
+    /// keyframe interval, so a piece costs what the same stretch of a full export does.
+    var samplePieceLength: Double { get }
     func export(
         master: URL,
         options: ExportOptions,

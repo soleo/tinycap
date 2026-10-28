@@ -124,3 +124,25 @@ final class KeyComboTests: XCTestCase {
         XCTAssertEqual(store.combo(for: .recordScreen), ShortcutAction.recordScreen.defaultCombo)
     }
 }
+
+final class SizeSamplingTests: XCTestCase {
+    func testShortClipIsSampledWhole() {
+        XCTAssertEqual(SizeSampling.windows(start: 1, end: 5.5, pieceLength: 2), [1...5.5])
+        XCTAssertEqual(SizeSampling.windows(start: 0, end: 0, pieceLength: 2), [])
+    }
+
+    func testLongClipGetsSpreadPiecesOfOneKeyframeInterval() {
+        let w = SizeSampling.windows(start: 10, end: 40, pieceLength: 2)
+        XCTAssertEqual(w.count, 2)
+        XCTAssertTrue(w.allSatisfy { abs(($0.upperBound - $0.lowerBound) - 2) < 1e-9 })
+        XCTAssertEqual((w[0].lowerBound + w[0].upperBound) / 2, 17.5, accuracy: 1e-9) // 1/4 in
+        XCTAssertEqual((w[1].lowerBound + w[1].upperBound) / 2, 32.5, accuracy: 1e-9) // 3/4 in
+        XCTAssertLessThanOrEqual(w[0].upperBound, w[1].lowerBound)
+        XCTAssertTrue(w.allSatisfy { $0.lowerBound >= 10 && $0.upperBound <= 40 })
+    }
+
+    func testExtrapolate() {
+        XCTAssertEqual(SizeSampling.extrapolate(sampleBytes: 100_000, sampleSeconds: 4, totalSeconds: 30, containerOverhead: 0), 750_000)
+        XCTAssertEqual(SizeSampling.extrapolate(sampleBytes: 100, sampleSeconds: 0, totalSeconds: 30, containerOverhead: 7), 7)
+    }
+}

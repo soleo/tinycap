@@ -7,6 +7,8 @@ import VideoToolbox
 /// AVAssetWriter (hardware H.264/HEVC via VideoToolbox), applying trim, bitrate and scale.
 struct MP4Exporter: Exporter {
     let fileExtension = "mp4"
+    static let keyframeSeconds = 2.0
+    var samplePieceLength: Double { Self.keyframeSeconds }
 
     func export(
         master: URL,
@@ -35,7 +37,8 @@ struct MP4Exporter: Exporter {
         var compression: [String: Any] = [
             AVVideoAverageBitRateKey: bitrate,
             AVVideoExpectedSourceFrameRateKey: fps,
-            AVVideoMaxKeyFrameIntervalKey: Int(fps * 2),
+            AVVideoMaxKeyFrameIntervalKey: Int(fps * Self.keyframeSeconds),
+            AVVideoMaxKeyFrameIntervalDurationKey: Self.keyframeSeconds,
             AVVideoAllowFrameReorderingKey: true,
         ]
         if options.settings.codec == .h264 {

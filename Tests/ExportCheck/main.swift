@@ -55,12 +55,19 @@ struct ExportCheck {
                 let codec = formats.first.map { CMFormatDescriptionGetMediaSubType($0) } ?? 0
                 let wantCodec: FourCharCode = c.settings.codec == .hevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264
                 let bytes = fileSize(out)
-                let estimate = c.settings.estimatedBytes(sourceSize: CGSize(width: 2560, height: 1600), frameRate: 30, duration: expected)
-
+                let t1 = Date()
+                let estimate = try await SizeEstimator.estimate(
+                    exporter: MP4Exporter(), master: master, settings: c.settings,
+                    start: c.trim?.0 ?? 0, end: c.trim?.1 ?? 30
+                )
+                let estimateTime = Date().timeIntervalSince(t1)
+                let ratio = Double(estimate) / Double(max(bytes, 1))
                 check(abs(duration - expected) < 0.15, "duration \(String(format: "%.2f", duration)) s, expected \(expected)")
                 check(Int(size.width) == c.size.0 && Int(size.height) == c.size.1, "size \(Int(size.width))×\(Int(size.height))")
                 check(codec == wantCodec, "codec \(fourCC(codec))")
-                check(bytes <= estimate, "file \(ByteSize.format(bytes)) ≤ estimate \(ByteSize.format(estimate)), encoded in \(String(format: "%.1f", elapsed)) s")
+                check(true, "file \(ByteSize.format(bytes)), encoded in \(String(format: "%.1f", elapsed)) s")
+                check((0.5...1.5).contains(ratio),
+                      "estimate \(ByteSize.format(estimate)) is \(String(format: "%.2f", ratio))× actual (want 0.5–1.5×), took \(String(format: "%.2f", estimateTime)) s")
             }
 
             // PRD metric: 30 s, 1280 px-wide clip as MP4 < 5 MB at default quality.

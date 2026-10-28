@@ -12,15 +12,16 @@ export CLANG_MODULE_CACHE_PATH="$MODCACHE"
 EXTRA=()
 if [[ "${NESTED_SANDBOX:-1}" == "0" ]]; then EXTRA+=(-disable-sandbox); fi
 
-xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE" "${EXTRA[@]}" \
+xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE" ${EXTRA[@]+"${EXTRA[@]}"} \
   -parse-as-library -module-name TinycapCore \
   -emit-library -static -emit-module -emit-module-path "$OUT/TinycapCore.swiftmodule" \
   -o "$OUT/libTinycapCore.a" "$ROOT"/Sources/TinycapCore/*.swift
 
-xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE" "${EXTRA[@]}" \
+xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE" ${EXTRA[@]+"${EXTRA[@]}"} \
   -parse-as-library -module-name ExportCheck -I "$OUT" -L "$OUT" -lTinycapCore \
   -o "$OUT/export-check" \
   "$ROOT/Sources/Tinycap/Export/Exporter.swift" "$ROOT/Sources/Tinycap/Export/MP4Exporter.swift" \
+  "$ROOT/Sources/Tinycap/Export/SizeEstimator.swift" \
   "$ROOT/Tests/ExportCheck/main.swift"
 
 "$OUT/export-check" "$OUT"

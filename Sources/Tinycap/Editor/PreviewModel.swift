@@ -24,6 +24,15 @@ final class PreviewModel {
     private(set) var playhead: Double = 0
     private(set) var isPlaying = false
 
+    enum Estimate: Equatable {
+        case none
+        /// A new estimate is running; the last value (if any) stays on screen, dimmed.
+        case estimating(previous: Int64?)
+        case bytes(Int64)
+        case unavailable
+    }
+    private(set) var estimate: Estimate = .none
+
     var codec: VideoCodec { didSet { persist() } }
     var quality: Double { didSet { persist() } }
     var scale: OutputScale { didSet { persist() } }
@@ -31,6 +40,7 @@ final class PreviewModel {
     private let exporter: Exporter = MP4Exporter()
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var exportTask: Task<Void, Never>?
+    @ObservationIgnored private var estimateTask: Task<Void, Never>?
 
     init(master: URL) {
         self.master = master
@@ -46,6 +56,7 @@ final class PreviewModel {
 
     func tearDown() {
         exportTask?.cancel()
+        estimateTask?.cancel()
         player.pause()
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         timeObserver = nil
@@ -57,6 +68,7 @@ final class PreviewModel {
             self.info = info
             trim = TrimRange(duration: info.duration)
             phase = .ready
+            scheduleEstimate(delay: .zero)
         } catch {
             phase = .failed("This recording can't be opened: \(error.localizedDescription)")
         }
@@ -70,8 +82,32 @@ final class PreviewModel {
         info.map { settings.outputSize(for: $0.pixelSize) }
     }
 
-    var estimatedBytes: Int64? {
-        info.map { settings.estimatedBytes(sourceSize: $0.pixelSize, frameRate: $0.frameRate, duration: trim.length) }
+    /// Re-estimates after settings or trim settle. Encodes ~2 s of the real clip.
+    private func scheduleEstimate(delay: Duration = .milliseconds(400)) {
+        estimateTask?.cancel()
+        guard info != nil else { return }
+        let previous: Int64?
+        switch estimate {
+        case .bytes(let b): previous = b
+        case .estimating(let p): previous = p
+        default: previous = nil
+        }
+        estimate = .estimating(previous: previous)
+
+        let exporter = self.exporter, master = self.master, settings = self.settings
+        let start = trim.start, end = trim.end
+        estimateTask = Task {
+            do {
+                try await Task.sleep(for: delay)
+                let bytes = try await SizeEstimator.estimate(exporter: exporter, master: master, settings: settings, start: start, end: end)
+                try Task.checkCancellation()
+                estimate = .bytes(bytes)
+            } catch is CancellationError {
+                // Superseded by a newer estimate.
+            } catch {
+                estimate = .unavailable
+            }
+        }
     }
 
     private func persist() {
@@ -80,6 +116,7 @@ final class PreviewModel {
         d.set(quality, forKey: PreferenceKey.exportQuality)
         d.set(scale.storageValue, forKey: PreferenceKey.exportScale)
         if case .exported = phase { phase = .ready } // settings changed: offer Export again
+        scheduleEstimate()
     }
 
     // MARK: - Playback
@@ -138,8 +175,10 @@ final class PreviewModel {
         invalidateExport()
     }
 
+    /// Trim changed: the exported file no longer matches, and the estimate is stale.
     private func invalidateExport() {
         if case .exported = phase { phase = .ready }
+        scheduleEstimate()
     }
 
     // MARK: - Export
