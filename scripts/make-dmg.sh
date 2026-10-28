@@ -51,8 +51,9 @@ else
   [[ -n "${SIGN_IDENTITY:-}" ]] || die "set SIGN_IDENTITY to your 'Developer ID Application: …' identity (or use --unsigned)"
   [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]] \
     || die "SIGN_IDENTITY must be a 'Developer ID Application' identity for direct distribution (got '$SIGN_IDENTITY')"
-  security find-identity -v -p codesigning | grep -qF "$SIGN_IDENTITY" \
-    || die "identity not found in your keychain: $SIGN_IDENTITY"
+  # Capture first: `cmd | grep -q` under pipefail fails when grep exits before cmd finishes.
+  identities="$(security find-identity -v -p codesigning)"
+  [[ "$identities" == *"\"$SIGN_IDENTITY\""* ]] || die "identity not found in your keychain: $SIGN_IDENTITY"
   [[ -n "${NOTARY_PROFILE:-}" ]] || die "set NOTARY_PROFILE to a notarytool keychain profile (see the header of this script)"
   if [[ "${ALLOW_PORTABLE_VPX:-0}" != "1" ]] && ! command -v nasm >/dev/null && ! command -v yasm >/dev/null; then
     die "nasm not found: the Intel build of libvpx would be slow. Run 'brew install nasm', or set ALLOW_PORTABLE_VPX=1"
@@ -76,7 +77,10 @@ archs="$(xcrun lipo -archs "$APP/Contents/MacOS/Tinycap")"
 [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || die "expected a universal binary, got: $archs"
 codesign --verify --strict --deep "$APP" || die "app signature doesn't verify"
 if [[ "$UNSIGNED" == "0" ]]; then
-  codesign -d --verbose=2 "$APP" 2>&1 | grep -q "flags=.*runtime" || die "hardened runtime is not enabled"
+  signature="$(codesign -d --verbose=2 "$APP" 2>&1)"
+  [[ "$signature" =~ flags=0x[0-9a-f]+\([^\)]*runtime ]] || die "hardened runtime is not enabled"
+  team="$(echo "$SIGN_IDENTITY" | sed -E 's/.*\(([A-Z0-9]+)\)$/\1/')"
+  [[ "$signature" == *"TeamIdentifier=$team"* ]] || die "app isn't signed by team $team"
 fi
 
 # --- 2. DMG ----------------------------------------------------------------------
