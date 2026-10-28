@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tinycap — tiny screen recorder for macOS</title>
+  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder. Record a window, a screen or an area, trim it, and export MP4, WebM or GIF. Free, open source, and nothing leaves your Mac.">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="Tinycap — tiny screen recorder for macOS">
+  <meta property="og:description" content="Record a window, a screen or an area from the menu bar. Trim, then export MP4, WebM or GIF. Free and open source.">
+  <meta property="og:image" content="https://soleo.github.io/tinycap/assets/icon-512.png">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="./" aria-label="Tinycap home">
+      <img src="assets/favicon-64.png" width="28" height="28" alt="">
+      <span>Tinycap</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="https://github.com/soleo/tinycap">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="hero-copy">
+        <img class="hero-icon" src="assets/icon-256.png" width="128" height="128" alt="Tinycap app icon: a window inside dashed capture corners, with a pointer">
+        <h1>Record your screen.<br>Get a small file.</h1>
+        <p class="lead">Tinycap lives in your menu bar. Pick a window, a screen or an area, record, trim, and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — sized for pull requests, bug reports and chat.</p>
+        <div class="cta">
+          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.1.0/Tinycap-0.1.0.dmg">
+            <span class="rec" aria-hidden="true"></span> Download for Mac
+          </a>
+          <a class="button" href="https://github.com/soleo/tinycap">View source</a>
+        </div>
+        <p class="fine">Version 0.1.0 · 3.4 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Free and open source (MIT).</p>
+      </div>
+
+      <figure class="demo" aria-label="Illustration: Tinycap's menu-bar menu and an area being selected">
+        <div class="screen" aria-hidden="true">
+          <div class="menubar">
+            <span class="apple"></span>
+            <span class="menubar-spacer"></span>
+            <span class="menubar-icon"><img src="assets/favicon-32.png" width="16" height="16" alt=""></span>
+            <span class="clock">9:41</span>
+          </div>
+          <div class="menu">
+            <div class="menu-item">Record Window <kbd>⌃⌥⌘W</kbd></div>
+            <div class="menu-item">Record Screen <kbd>⌃⌥⌘S</kbd></div>
+            <div class="menu-item active">Record Area <kbd>⌃⌥⌘A</kbd></div>
+            <div class="menu-sep"></div>
+            <div class="menu-item">Open Recent <span class="chev">›</span></div>
+            <div class="menu-sep"></div>
+            <div class="menu-item">Settings… <kbd>⌘,</kbd></div>
+            <div class="menu-item">Quit Tinycap <kbd>⌘Q</kbd></div>
+          </div>
+          <div class="dim"></div>
+          <div class="selection">
+            <span class="size">640 × 400</span>
+            <span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span>
+            <span class="h tm"></span><span class="h bm"></span><span class="h ml"></span><span class="h mr"></span>
+          </div>
+          <div class="bar">
+            <span class="pop">30 fps ▾</span>
+            <span class="check">☑ Cursor</span>
+            <span class="btn">Cancel</span>
+            <span class="btn red">Record</span>
+          </div>
+        </div>
+        <figcaption>Record Area: drag a rectangle, adjust it, press Return.</figcaption>
+      </figure>
+    </section>
+
+    <section id="features" class="section">
+      <h2>Small app, small files</h2>
+      <div class="grid">
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">▣</span> Window, screen or area</h3>
+          <p>Hover to pick a window, click a display, or drag any rectangle with live W × H and resize handles. Window recordings follow the window when it moves.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">✂</span> Preview and trim</h3>
+          <p>When you stop, a preview opens. Drag the trim handles, or press I and O at the playhead. No re-recording a clip because the start was slow.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">⇩</span> MP4, WebM or GIF</h3>
+          <p>MP4 as H.264 or HEVC, WebM as VP9, or GIF with presets. Pick quality and size; the frame timing of your recording is kept.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">≈</span> Size before you export</h3>
+          <p>Tinycap encodes a short sample of your clip to estimate the file size. For GIF, “Fit under 10 MB” steps the settings down until it fits.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">◧</span> GIFs that stay small</h3>
+          <p>Its own encoder stores only what changed between frames, keeps one palette so colors don’t flicker, and merges frames where nothing moved.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">⌘</span> Out of your way</h3>
+          <p>No Dock icon, no window until you need one. Global shortcuts you can change, and the menu-bar timer stops the recording with one click.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">⌂</span> Stays on your Mac</h3>
+          <p>No accounts, no uploads, no telemetry. The app is sandboxed and has no network access at all; files go to your Movies folder.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">✦</span> Native and light</h3>
+          <p>Built with Swift, SwiftUI and ScreenCaptureKit. The whole app is about 7 MB and records straight to disk with hardware encoding.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="how" class="section">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><div><h3>Choose</h3><p>Click the menu-bar icon, or press a shortcut, and pick Window, Screen or Area.</p></div></li>
+        <li><span class="n">2</span><div><h3>Record</h3><p>The icon turns into a timer. Click it, or press ⌃⌥⌘. to stop.</p></div></li>
+        <li><span class="n">3</span><div><h3>Trim</h3><p>The preview plays your clip. Cut the start and end.</p></div></li>
+        <li><span class="n">4</span><div><h3>Export</h3><p>Pick MP4, WebM or GIF, check the size, export. Copy it, show it in Finder, or drag it straight into Slack or GitHub.</p></div></li>
+      </ol>
+    </section>
+
+    <section id="shortcuts" class="section split">
+      <div>
+        <h2>Shortcuts</h2>
+        <p>Global shortcuts work from any app, so the menu never shows up in your recording. Change them in Settings.</p>
+      </div>
+      <table class="keys">
+        <caption class="visually-hidden">Default global shortcuts</caption>
+        <tbody>
+          <tr><th scope="row">Record Area</th><td><kbd>⌃⌥⌘A</kbd></td></tr>
+          <tr><th scope="row">Record Window</th><td><kbd>⌃⌥⌘W</kbd></td></tr>
+          <tr><th scope="row">Record Screen</th><td><kbd>⌃⌥⌘S</kbd></td></tr>
+          <tr><th scope="row">Stop Recording</th><td><kbd>⌃⌥⌘.</kbd></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section split">
+      <div>
+        <h2>Open source</h2>
+        <p>Tinycap is MIT licensed. WebM export uses libvpx and libwebm from the WebM Project, built from pinned source. Issues and pull requests are welcome.</p>
+        <p><a href="https://github.com/soleo/tinycap">github.com/soleo/tinycap</a> · <a href="https://github.com/soleo/tinycap/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a></p>
+      </div>
+      <pre class="code" aria-label="Build from source"><code>git clone https://github.com/soleo/tinycap
+cd tinycap
+scripts/build-app.sh
+open build/Tinycap.app</code></pre>
+    </section>
+
+    <section class="section final">
+      <img src="assets/icon-256.png" width="96" height="96" alt="">
+      <h2>Try Tinycap</h2>
+      <p>Free. On first launch, macOS asks you to allow Screen Recording — Tinycap walks you through it.</p>
+      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.1.0/Tinycap-0.1.0.dmg">
+        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.1.0
+      </a>
+      <p class="fine"><a href="https://github.com/soleo/tinycap/releases">All releases and checksums</a></p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Tinycap · MIT License · Made for the Mac. Not affiliated with Apple.</p>
+  </footer>
+</body>
+</html>
