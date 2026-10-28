@@ -29,6 +29,8 @@ public enum PreferenceKey {
     public static let gifLoop = "gif.loop"
     public static let gifDropDuplicates = "gif.dropDuplicates"
     public static let gifFitTargetMB = "gif.fitTargetMB"
+    public static let webmQuality = "webm.quality"
+    public static let webmScale = "webm.scale"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [

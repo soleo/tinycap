@@ -88,9 +88,13 @@ struct PreviewView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 140)
+                .frame(width: 200)
             }
-            if model.format == .mp4 { mp4Options } else { gifOptions }
+            switch model.format {
+            case .mp4: mp4Options
+            case .webm: webmOptions
+            case .gif: gifOptions
+            }
             GridRow {
                 Text("")
                 summary
@@ -124,6 +128,31 @@ struct PreviewView: View {
         GridRow {
             Text("Size")
             ScalePicker(scale: $model.scale, sourceWidth: model.info.map { Int($0.pixelSize.width) })
+        }
+    }
+
+    @ViewBuilder
+    private var webmOptions: some View {
+        GridRow {
+            Text("Codec")
+            Text("VP9")
+                .foregroundStyle(.secondary)
+                .help("Plays inline in Chrome, Firefox, Edge, Safari 14.1+ and Slack")
+        }
+        GridRow {
+            Text("Quality")
+            HStack {
+                Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                Slider(value: $model.webm.quality, in: 0...1)
+                    .frame(maxWidth: 220)
+                    .accessibilityLabel("Quality")
+                    .accessibilityValue("\(Int(model.webm.quality * 100)) percent")
+                Text("Better").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        GridRow {
+            Text("Size")
+            ScalePicker(scale: $model.webm.scale, sourceWidth: model.info.map { Int($0.pixelSize.width) })
         }
     }
 

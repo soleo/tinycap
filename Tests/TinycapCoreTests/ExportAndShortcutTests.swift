@@ -146,3 +146,27 @@ final class SizeSamplingTests: XCTestCase {
         XCTAssertEqual(SizeSampling.extrapolate(sampleBytes: 100, sampleSeconds: 0, totalSeconds: 30, containerOverhead: 7), 7)
     }
 }
+
+final class WebMSettingsTests: XCTestCase {
+    func testCQLevelTracksQuality() {
+        XCTAssertEqual(WebMSettings(quality: 0).cqLevel, 50)
+        XCTAssertEqual(WebMSettings().cqLevel, 35)
+        XCTAssertEqual(WebMSettings(quality: 1).cqLevel, 20)
+        XCTAssertEqual(WebMSettings(quality: 7).quality, 1)
+    }
+
+    func testBitrateCapAndSize() {
+        let s = WebMSettings(scale: .half)
+        XCTAssertTrue(s.outputSize(for: CGSize(width: 2560, height: 1600)) == (1280, 800))
+        XCTAssertGreaterThanOrEqual(s.maxBitrateKbps(width: 16, height: 16, frameRate: 1), 500)
+        XCTAssertGreaterThan(s.maxBitrateKbps(width: 1920, height: 1080, frameRate: 60), s.maxBitrateKbps(width: 1280, height: 720, frameRate: 30))
+    }
+
+    func testDefaultsRoundTrip() {
+        let defaults = UserDefaults(suiteName: "WebMSettingsTests-\(UUID().uuidString)")!
+        XCTAssertEqual(WebMSettings(defaults: defaults), WebMSettings())
+        let custom = WebMSettings(quality: 0.8, scale: .width(1280))
+        custom.save(to: defaults)
+        XCTAssertEqual(WebMSettings(defaults: defaults), custom)
+    }
+}

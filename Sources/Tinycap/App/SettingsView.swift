@@ -94,6 +94,12 @@ private struct GeneralSettingsView: View {
                         .controlSize(.small)
                 }
             }
+
+            Section {
+                LabeledContent("Tinycap is open source under the MIT license.") {
+                    Button("Acknowledgements…") { AcknowledgementsWindowController.shared.show() }
+                }
+            }
         }
         .formStyle(.grouped)
     }
@@ -145,6 +151,8 @@ private struct ExportSettingsView: View {
     @AppStorage(PreferenceKey.exportQuality) private var quality = ExportSettings.defaultQuality
     @AppStorage(PreferenceKey.exportScale) private var scale = OutputScale.full.storageValue
     @AppStorage(PreferenceKey.gifFitTargetMB) private var fitTargetMB = 10
+    @AppStorage(PreferenceKey.webmQuality) private var webmQuality = WebMSettings.defaultQuality
+    @AppStorage(PreferenceKey.webmScale) private var webmScale = OutputScale.full.storageValue
     @State private var gif = GIFSettings(defaults: .standard)
 
     var body: some View {
@@ -175,6 +183,27 @@ private struct ExportSettingsView: View {
                         Text("\(w) px wide").tag(scale)
                     }
                 }
+            }
+
+            Section("WebM") {
+                LabeledContent("Quality") {
+                    HStack {
+                        Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: $webmQuality, in: 0...1).accessibilityLabel("WebM quality")
+                        Text("Better").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Picker("Size", selection: $webmScale) {
+                    Text("Full (1×)").tag(OutputScale.full.storageValue)
+                    Text("Half (0.5×)").tag(OutputScale.half.storageValue)
+                    Text("1280 px wide").tag(OutputScale.width(1280).storageValue)
+                    if case .width(let w) = OutputScale(storageValue: webmScale), w != 1280 {
+                        Text("\(w) px wide").tag(webmScale)
+                    }
+                }
+                Text("VP9. Plays inline in Chrome, Firefox, Edge, Safari 14.1+ and Slack.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("GIF") {

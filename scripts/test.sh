@@ -40,3 +40,16 @@ xcrun swiftc -target "$TARGET" -swift-version 6 -module-cache-path "$MODCACHE" \
   -o "$BUNDLE/Contents/MacOS/TinycapCoreTests" "$ROOT"/Tests/TinycapCoreTests/*.swift
 
 xcrun xctest "$BUNDLE"
+
+# WebM bridge: encode synthetic frames with libvpx/libwebm, then parse and decode them.
+"$ROOT/scripts/build-vpx.sh"
+VENDOR="$ROOT/build/vendor"
+BRIDGE_FLAGS=(-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I "$ROOT/Sources/VPXBridge/include"
+              -I "$VENDOR/include" -I "$VENDOR/include/libwebm")
+xcrun clang++ "${BRIDGE_FLAGS[@]}" -c "$ROOT/Sources/VPXBridge/VPXBridge.cc" -o "$OUT/VPXBridge.o"
+xcrun clang++ "${BRIDGE_FLAGS[@]}" -c "$ROOT/Sources/VPXInspect/VPXInspect.cc" -o "$OUT/VPXInspect.o"
+xcrun clang -O2 -Wall -I "$ROOT/Sources/VPXBridge/include" -c "$ROOT/Tests/VPXBridgeTests/main.c" -o "$OUT/vpx-main.o"
+xcrun clang++ "$OUT/VPXBridge.o" "$OUT/VPXInspect.o" "$OUT/vpx-main.o" -L "$VENDOR/lib" -lvpx -lwebm \
+  -o "$OUT/vpxbridge-test"
+echo "VPXBridge round trip"
+"$OUT/vpxbridge-test" "$OUT/vpxbridge-test.webm"

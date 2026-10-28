@@ -2,9 +2,15 @@ import CoreGraphics
 import Foundation
 
 public enum ExportFormat: String, Sendable, CaseIterable, Identifiable {
-    case mp4, gif
+    case mp4, webm, gif
     public var id: String { rawValue }
-    public var displayName: String { self == .mp4 ? "MP4" : "GIF" }
+    public var displayName: String {
+        switch self {
+        case .mp4: return "MP4"
+        case .webm: return "WebM"
+        case .gif: return "GIF"
+        }
+    }
     public var fileExtension: String { rawValue }
 }
 
