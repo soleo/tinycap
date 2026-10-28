@@ -1,6 +1,9 @@
 import AppKit
 import ScreenCaptureKit
+import os
 import TinycapCore
+
+private let log = Logger(subsystem: "app.tinycap.Tinycap", category: "recording")
 
 /// Runs one recording end to end: select → record → stop → preview.
 @MainActor
@@ -22,6 +25,7 @@ final class RecordingCoordinator {
     private let onNeedsPermission: () -> Void
     private var border: RecordingBorderWindow?
     private var countdown: CountdownController?
+    private var clicks: ClickHighlighter?
     private var previews: [PreviewWindowController] = []
 
     init(onNeedsPermission: @escaping () -> Void) {
@@ -113,16 +117,36 @@ final class RecordingCoordinator {
         content: SCShareableContent,
         borderRect: CGRect?
     ) async throws {
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        let ownApp = content.applications.first { $0.processID == ownPID }
         let master = try Self.newMasterURL()
 
-        try await recorder.start(
-            target: target,
-            settings: settings,
-            excludingApp: ownApp,
-            outputURL: master
-        )
+        var ownWindows: [SCWindow] = []
+        if settings.highlightsClicks, let window = await startClickHighlighter(for: target) {
+            ownWindows.append(window)
+        }
+
+        // Find Tinycap in a list that includes apps with no window on screen: after the
+        // picker closes Tinycap may have none, and the earlier on-screen-only list
+        // leaves it out. Without it, nothing of Tinycap's is excluded, and the
+        // click overlay (an exception to that exclusion) would be hidden instead.
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let allApps = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let ownApp = (allApps?.applications ?? content.applications).first { $0.processID == ownPID }
+        if ownApp == nil {
+            log.error("Tinycap not found in shareable applications; its own windows will be captured")
+        }
+
+        do {
+            try await recorder.start(
+                target: target,
+                settings: settings,
+                excludingApp: ownApp,
+                includingOwnWindows: ownWindows,
+                outputURL: master
+            )
+        } catch {
+            stopClickHighlighter()
+            throw error
+        }
 
         if let borderRect {
             let border = RecordingBorderWindow(globalRect: borderRect)
@@ -130,6 +154,39 @@ final class RecordingCoordinator {
             self.border = border
         }
         state = .recording(startedAt: Date())
+    }
+
+    /// Shows the click overlay on the recorded screen and returns its window for the
+    /// capture filter. Nil for window recordings or if the overlay can't be found.
+    private func startClickHighlighter(for target: CaptureTarget) async -> SCWindow? {
+        let display: SCDisplay
+        switch target {
+        case .display(let d), .area(let d, _): display = d
+        case .window: return nil
+        }
+        guard let screen = NSScreen.screens.first(where: { $0.displayID == display.displayID }) else { return nil }
+
+        let highlighter = ClickHighlighter(screen: screen)
+        highlighter.start()
+        clicks = highlighter
+        // The window server can take a moment to list a new window.
+        for _ in 0..<5 {
+            if let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
+               let window = content.windows.first(where: { $0.windowID == highlighter.windowID }) {
+                let pid = ProcessInfo.processInfo.processIdentifier
+                log.notice("click overlay found: window \(window.windowID, privacy: .public) layer \(window.windowLayer, privacy: .public) onScreen \(window.isOnScreen, privacy: .public) frame \(String(describing: window.frame), privacy: .public) owner pid \(window.owningApplication?.processID ?? -1, privacy: .public) (own \(pid, privacy: .public))")
+                return window
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        log.error("click overlay window \(highlighter.windowID, privacy: .public) not found in shareable content")
+        stopClickHighlighter()
+        return nil
+    }
+
+    private func stopClickHighlighter() {
+        clicks?.stop()
+        clicks = nil
     }
 
     /// Masters live in Application Support so a crash or quit leaves them recoverable.
@@ -150,6 +207,7 @@ final class RecordingCoordinator {
         state = .saving
         border?.orderOut(nil)
         border = nil
+        stopClickHighlighter()
 
         Task {
             do {
