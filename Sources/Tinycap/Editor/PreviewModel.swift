@@ -38,6 +38,8 @@ final class PreviewModel {
     var codec: VideoCodec { didSet { persist() } }
     var quality: Double { didSet { persist() } }
     var scale: OutputScale { didSet { persist() } }
+    // WebM
+    var webm: WebMSettings { didSet { persist() } }
     // GIF
     var gif: GIFSettings { didSet { persist() } }
 
@@ -63,6 +65,7 @@ final class PreviewModel {
         let defaults = UserDefaults.standard
         format = ExportFormat(rawValue: defaults.string(forKey: PreferenceKey.exportFormat) ?? "") ?? .mp4
         gif = GIFSettings(defaults: defaults)
+        webm = WebMSettings(defaults: defaults)
         let saved = ExportSettings(defaults: defaults)
         codec = saved.codec
         quality = saved.quality
@@ -97,7 +100,11 @@ final class PreviewModel {
     var mp4Settings: ExportSettings { ExportSettings(codec: codec, quality: quality, scale: scale) }
 
     var formatSettings: FormatSettings {
-        format == .gif ? .gif(gif) : .mp4(mp4Settings)
+        switch format {
+        case .mp4: return .mp4(mp4Settings)
+        case .webm: return .webm(webm)
+        case .gif: return .gif(gif)
+        }
     }
 
     private var exporter: Exporter { Exporters.exporter(for: format) }
@@ -147,6 +154,7 @@ final class PreviewModel {
         d.set(quality, forKey: PreferenceKey.exportQuality)
         d.set(scale.storageValue, forKey: PreferenceKey.exportScale)
         gif.save(to: d)
+        webm.save(to: d)
         if case .exported = phase { phase = .ready } // settings changed: offer Export again
         if !applyingFit {
             fitTask?.cancel()

@@ -4,11 +4,13 @@ import TinycapCore
 /// Format and its options for one export.
 enum FormatSettings: Sendable, Equatable {
     case mp4(ExportSettings)
+    case webm(WebMSettings)
     case gif(GIFSettings)
 
     var format: ExportFormat {
         switch self {
         case .mp4: return .mp4
+        case .webm: return .webm
         case .gif: return .gif
         }
     }
@@ -16,6 +18,7 @@ enum FormatSettings: Sendable, Equatable {
     func outputSize(for source: CGSize) -> (width: Int, height: Int) {
         switch self {
         case .mp4(let s): return s.outputSize(for: source)
+        case .webm(let s): return s.outputSize(for: source)
         case .gif(let s): return s.outputSize(for: source)
         }
     }
@@ -28,7 +31,7 @@ struct ExportOptions: Sendable {
     var format: FormatSettings
 }
 
-/// Turns the master .mov into a shareable file. One type per format (MP4, GIF; WebM in M4).
+/// Turns the master .mov into a shareable file. One type per format.
 protocol Exporter: Sendable {
     var fileExtension: String { get }
     func export(
@@ -45,6 +48,7 @@ enum Exporters {
     static func exporter(for format: ExportFormat) -> Exporter {
         switch format {
         case .mp4: return MP4Exporter()
+        case .webm: return WebMExporter()
         case .gif: return GIFExporter()
         }
     }

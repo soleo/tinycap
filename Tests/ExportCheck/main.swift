@@ -6,6 +6,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import TinycapCore
+import VPXBridge
 
 @main
 struct ExportCheck {
@@ -154,6 +155,57 @@ struct ExportCheck {
                 check(false, "cancel threw nothing (export finished first?)")
             }
             check(!FileManager.default.fileExists(atPath: cancelledGIF.path), "no partial GIF after cancel")
+
+            // WebM (M4)
+            struct WebMCase { let name: String; let settings: WebMSettings; let trim: (Double, Double)?; let size: (Int, Int) }
+            let webmCases = [
+                WebMCase(name: "webm-default", settings: WebMSettings(), trim: nil, size: (2560, 1600)),
+                WebMCase(name: "webm-half-trimmed", settings: WebMSettings(quality: 0.3, scale: .half), trim: (5, 12.5), size: (1280, 800)),
+            ]
+            for c in webmCases {
+                print(c.name)
+                let out = dir.appendingPathComponent(c.name).appendingPathExtension("webm")
+                let range = c.trim.map { CMTimeRange(seconds: $0.0, $0.1) }
+                let t0 = Date()
+                try await WebMExporter().export(master: master, options: ExportOptions(timeRange: range, format: .webm(c.settings)), to: out) { _ in }
+                let elapsed = Date().timeIntervalSince(t0)
+                let expected = c.trim.map { $0.1 - $0.0 } ?? 30
+                let bytes = fileSize(out)
+
+                var info = TCWebMInfo()
+                var err = [CChar](repeating: 0, count: 256)
+                let ok = out.path.withCString { tc_webm_inspect($0, &info, &err, err.count) } == 0
+                check(ok, "parses as WebM")
+                check(info.is_vp9 != 0, "codec V_VP9")
+                check(Int(info.width) == c.size.0 && Int(info.height) == c.size.1, "size \(info.width)×\(info.height)")
+                check(info.frames > 0 && info.decoded_frames == info.frames,
+                      "\(info.decoded_frames)/\(info.frames) frames decode, \(info.keyframes) keyframes")
+                let seconds = Double(info.duration_ns) / 1e9
+                check(abs(seconds - expected) < 0.1, "duration \(String(format: "%.2f", seconds)) s, expected \(expected)")
+
+                let estimate = try await WebMExporter().estimateSize(
+                    master: master, options: ExportOptions(timeRange: nil, format: .webm(c.settings)),
+                    start: c.trim?.0 ?? 0, end: c.trim?.1 ?? 30
+                )
+                let ratio = Double(estimate) / Double(max(bytes, 1))
+                check(true, "file \(ByteSize.format(bytes)), encoded in \(String(format: "%.1f", elapsed)) s")
+                check((0.5...1.5).contains(ratio),
+                      "estimate \(ByteSize.format(estimate)) is \(String(format: "%.2f", ratio))× actual (want 0.5–1.5×)")
+            }
+
+            print("webm cancel")
+            let cancelledWebM = dir.appendingPathComponent("cancelled.webm")
+            let webmTask = Task {
+                try await WebMExporter().export(master: master, options: ExportOptions(timeRange: nil, format: .webm(WebMSettings())), to: cancelledWebM) { _ in }
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            webmTask.cancel()
+            if case .failure(let error) = await webmTask.result {
+                check(error is CancellationError, "cancel throws CancellationError (\(type(of: error)))")
+            } else {
+                check(false, "cancel threw nothing (export finished first?)")
+            }
+            check(!FileManager.default.fileExists(atPath: cancelledWebM.path), "no partial WebM after cancel")
         } catch {
             print("ERROR \(error)")
             failures += 1

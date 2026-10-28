@@ -1,0 +1,4 @@
+module VPXBridge {
+    header "VPXBridge.h"
+    export *
+}

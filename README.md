@@ -6,7 +6,7 @@ Requires macOS 15 Sequoia or later. MIT licensed.
 
 ## Status
 
-Milestones 1 (capture), 2 (preview and MP4 export) and 3 (GIF export) are in place.
+Milestones 1–4 are in place: capture, preview with trim, and export to MP4, WebM and GIF.
 
 **Capture**
 - Menu-bar app with no Dock icon: Record Window, Record Screen, Record Area, Open Recent, Settings, Quit. Opening the app again while it runs shows a small window with the record buttons.
@@ -20,6 +20,7 @@ Milestones 1 (capture), 2 (preview and MP4 export) and 3 (GIF export) are in pla
 - On stop, a preview window plays the clip
 - Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
 - MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
+- WebM (VP9) with a quality slider and size; keeps the recording's real frame timing, tagged BT.709 so browsers show the right colors
 - GIF with presets (Small, Balanced, High), frame rate 5–30, size, 32–256 colors, ordered dithering, loop, duplicate-frame dropping, and "Fit under N MB"
 - File-size estimate from a short sample encode, for MP4 and GIF
 - After export: Copy (paste the file into Slack, Mail, Finder), Show in Finder, or drag the file out
@@ -28,9 +29,10 @@ Milestones 1 (capture), 2 (preview and MP4 export) and 3 (GIF export) are in pla
 **Settings**
 - General: launch at login, save folder, file name pattern, editable global shortcuts (defaults ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop)
 - Recording: frame rate, cursor, Retina
-- Export: default format, MP4 codec/quality/size, GIF preset, loop and fit target
+- Export: default format, MP4 codec/quality/size, WebM quality/size, GIF preset, loop and fit target
+- Acknowledgements (third-party licenses) under General
 
-Next: WebM export (M4), countdown, click highlights and release packaging (M5).
+Next (M5): countdown, click highlights, onboarding polish and release packaging.
 
 ### How GIFs stay small
 
@@ -46,12 +48,19 @@ Tinycap has its own GIF encoder (`Sources/TinycapCore/GIFEncoder.swift`), writte
 ```sh
 scripts/build-app.sh            # release, universal (arm64 + x86_64) → build/Tinycap.app
 CONFIG=debug scripts/build-app.sh
-scripts/test.sh                 # unit tests for TinycapCore
-scripts/export-check.sh         # encodes a synthetic recording to MP4 and GIF: trim, scale, codecs, sizes, estimates, cancel
+scripts/test.sh                 # unit tests for TinycapCore + WebM bridge round trip
+scripts/export-check.sh         # encodes a synthetic recording to MP4, WebM and GIF and verifies the files
+scripts/build-vpx.sh            # builds libvpx + libwebm from pinned source (run automatically by the others)
 open build/Tinycap.app
 ```
 
-`swift build` and `swift test` also work, and `Package.swift` opens in Xcode.
+`swift build` and `swift test` also work, and `Package.swift` opens in Xcode (run `scripts/build-vpx.sh` once first).
+
+### WebM dependencies
+
+WebM export uses [libvpx](https://github.com/webmproject/libvpx) 1.15.0 (VP9) and [libwebm](https://github.com/webmproject/libwebm) 1.0.0.31 (container), both BSD-licensed. `scripts/build-vpx.sh` downloads the tagged source, checks SHA-256 hashes pinned in the script, and builds static universal libraries into `build/vendor` (about 1.5 minutes, then cached). Nothing prebuilt is downloaded. Licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and in the app under Settings → General → Acknowledgements.
+
+Install `nasm` (`brew install nasm`) before building releases. Without it the Intel slice of libvpx is built as portable C, which works but encodes VP9 several times slower on Intel Macs.
 
 The build script calls `swiftc` directly so it also runs inside restricted shells. If the shell is itself sandboxed and SwiftUI macros fail to expand ("swift-plugin-server produced malformed response"), run with `NESTED_SANDBOX=0`.
 
@@ -83,7 +92,9 @@ The script removes the light backdrop around the tile, centers it on Apple's 824
 | `Sources/Tinycap/Capture` | `ScreenRecorder` (ScreenCaptureKit) |
 | `Sources/Tinycap/Recording` | `RecordingCoordinator`: select → record → stop → preview |
 | `Sources/Tinycap/Editor` | Preview window: player, trim scrubber, export controls |
-| `Sources/Tinycap/Export` | `Exporter` protocol, MP4 exporter (AVAssetReader → AVAssetWriter), GIF exporter (decode → vImage scale → `GIFEncoder`), size estimates |
+| `Sources/Tinycap/Export` | `Exporter` protocol; MP4 (AVAssetReader → AVAssetWriter), WebM (I420 planes → VPXBridge), GIF (vImage → `GIFEncoder`); size estimates |
+| `Sources/VPXBridge` | C interface over libvpx and libwebm (encoder + muxer, linked into the app) |
+| `Sources/VPXInspect` | Parses and decodes WebM files; used only by the checks |
 | `Sources/Tinycap/Hotkeys` | Global shortcuts via Carbon `RegisterEventHotKey`, shortcut recorder |
 | `Resources` | Info.plist, entitlements, icon |
 

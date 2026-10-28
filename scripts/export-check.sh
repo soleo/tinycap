@@ -17,11 +17,21 @@ xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE
   -emit-library -static -emit-module -emit-module-path "$OUT/TinycapCore.swiftmodule" \
   -o "$OUT/libTinycapCore.a" "$ROOT"/Sources/TinycapCore/*.swift
 
+"$ROOT/scripts/build-vpx.sh"
+VENDOR="$ROOT/build/vendor"
+for f in VPXBridge/VPXBridge VPXInspect/VPXInspect; do
+  xcrun clang++ -target "$TARGET" -std=c++17 -O2 -w -I "$ROOT/Sources/VPXBridge/include" -I "$VENDOR/include" -I "$VENDOR/include/libwebm" \
+    -c "$ROOT/Sources/$f.cc" -o "$OUT/$(basename $f).o"
+done
+xcrun ar rcs "$OUT/libVPXCheck.a" "$OUT/VPXBridge.o" "$OUT/VPXInspect.o"
+
 xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE" ${EXTRA[@]+"${EXTRA[@]}"} \
   -parse-as-library -module-name ExportCheck -I "$OUT" -L "$OUT" -lTinycapCore \
+  -I "$ROOT/Sources/VPXBridge/include" -lVPXCheck -L "$VENDOR/lib" -lvpx -lwebm -lc++ \
   -o "$OUT/export-check" \
   "$ROOT/Sources/Tinycap/Export/Exporter.swift" "$ROOT/Sources/Tinycap/Export/MP4Exporter.swift" \
   "$ROOT/Sources/Tinycap/Export/SizeEstimator.swift" "$ROOT/Sources/Tinycap/Export/GIFExporter.swift" \
+  "$ROOT/Sources/Tinycap/Export/WebMExporter.swift" \
   "$ROOT/Tests/ExportCheck/main.swift"
 
 "$OUT/export-check" "$OUT"
