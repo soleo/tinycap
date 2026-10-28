@@ -4,6 +4,7 @@
 import AVFoundation
 import CoreGraphics
 import Foundation
+import ImageIO
 import TinycapCore
 
 @main
@@ -44,7 +45,7 @@ struct ExportCheck {
                     CMTimeRange(start: CMTime(seconds: $0.0, preferredTimescale: 600), end: CMTime(seconds: $0.1, preferredTimescale: 600))
                 }
                 let t0 = Date()
-                try await MP4Exporter().export(master: master, options: ExportOptions(timeRange: range, settings: c.settings), to: out) { _ in }
+                try await MP4Exporter().export(master: master, options: ExportOptions(timeRange: range, format: .mp4(c.settings)), to: out) { _ in }
                 let elapsed = Date().timeIntervalSince(t0)
 
                 let asset = AVURLAsset(url: out)
@@ -56,8 +57,8 @@ struct ExportCheck {
                 let wantCodec: FourCharCode = c.settings.codec == .hevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264
                 let bytes = fileSize(out)
                 let t1 = Date()
-                let estimate = try await SizeEstimator.estimate(
-                    exporter: MP4Exporter(), master: master, settings: c.settings,
+                let estimate = try await MP4Exporter().estimateSize(
+                    master: master, options: ExportOptions(timeRange: nil, format: .mp4(c.settings)),
                     start: c.trim?.0 ?? 0, end: c.trim?.1 ?? 30
                 )
                 let estimateTime = Date().timeIntervalSince(t1)
@@ -78,7 +79,7 @@ struct ExportCheck {
             print("cancel")
             let cancelled = dir.appendingPathComponent("cancelled.mp4")
             let task = Task {
-                try await MP4Exporter().export(master: master, options: ExportOptions(timeRange: nil, settings: ExportSettings()), to: cancelled) { _ in }
+                try await MP4Exporter().export(master: master, options: ExportOptions(timeRange: nil, format: .mp4(ExportSettings())), to: cancelled) { _ in }
             }
             try await Task.sleep(for: .milliseconds(150))
             task.cancel()
@@ -89,6 +90,70 @@ struct ExportCheck {
                 check(false, "cancel threw nothing (export finished first?)")
             }
             check(!FileManager.default.fileExists(atPath: cancelled.path), "no partial file after cancel")
+
+            // GIF (M3)
+            struct GIFCase { let name: String; let settings: GIFSettings; let trim: (Double, Double)?; let size: (Int, Int) }
+            let gifCases = [
+                GIFCase(name: "gif-balanced", settings: GIFPreset.balanced.settings, trim: nil, size: (960, 600)),
+                GIFCase(name: "gif-small-trimmed-noloop", settings: { var s = GIFPreset.small.settings; s.loop = false; return s }(),
+                        trim: (5, 12.5), size: (640, 400)),
+                GIFCase(name: "gif-high-dither", settings: GIFPreset.high.settings, trim: (0, 10), size: (1280, 800)),
+            ]
+            for c in gifCases {
+                print(c.name)
+                let out = dir.appendingPathComponent(c.name).appendingPathExtension("gif")
+                let range = c.trim.map { CMTimeRange(seconds: $0.0, $0.1) }
+                let t0 = Date()
+                try await GIFExporter().export(master: master, options: ExportOptions(timeRange: range, format: .gif(c.settings)), to: out) { _ in }
+                let elapsed = Date().timeIntervalSince(t0)
+                let expected = c.trim.map { $0.1 - $0.0 } ?? 30
+                let bytes = fileSize(out)
+
+                guard let source = CGImageSourceCreateWithURL(out as CFURL, nil) else {
+                    check(false, "ImageIO can open the GIF"); continue
+                }
+                let count = CGImageSourceGetCount(source)
+                var total = 0.0
+                for i in 0..<count {
+                    let props = CGImageSourceCopyPropertiesAtIndex(source, i, nil) as? [CFString: Any]
+                    let gif = props?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+                    total += gif?[kCGImagePropertyGIFUnclampedDelayTime] as? Double ?? 0
+                }
+                let first = CGImageSourceCreateImageAtIndex(source, 0, nil)
+                let last = CGImageSourceCreateImageAtIndex(source, count - 1, nil)
+                let container = CGImageSourceCopyProperties(source, nil) as? [CFString: Any]
+                let loop = (container?[kCGImagePropertyGIFDictionary] as? [CFString: Any])?[kCGImagePropertyGIFLoopCount] as? Int
+
+                let estimate = try await GIFExporter().estimateSize(
+                    master: master, options: ExportOptions(timeRange: nil, format: .gif(c.settings)),
+                    start: c.trim?.0 ?? 0, end: c.trim?.1 ?? 30
+                )
+                let ratio = Double(estimate) / Double(max(bytes, 1))
+
+                check(first?.width == c.size.0 && first?.height == c.size.1, "size \(first?.width ?? 0)×\(first?.height ?? 0)")
+                check(last != nil && count > 1, "\(count) frames decode")
+                check(abs(total - expected) < 0.1, "total delay \(String(format: "%.2f", total)) s, expected \(expected)")
+                check((loop == 0) == c.settings.loop, "loop count \(loop.map(String.init) ?? "none") (loop \(c.settings.loop))")
+                check(true, "file \(ByteSize.format(bytes)), encoded in \(String(format: "%.1f", elapsed)) s")
+                check((0.5...1.5).contains(ratio),
+                      "estimate \(ByteSize.format(estimate)) is \(String(format: "%.2f", ratio))× actual (want 0.5–1.5×)")
+            }
+            let gifMetric = fileSize(dir.appendingPathComponent("gif-balanced.gif"))
+            check(gifMetric < 10_000_000, "PRD metric: 30 s clip as GIF at default preset is \(ByteSize.format(gifMetric)) (< 10 MB)")
+
+            print("gif cancel")
+            let cancelledGIF = dir.appendingPathComponent("cancelled.gif")
+            let gifTask = Task {
+                try await GIFExporter().export(master: master, options: ExportOptions(timeRange: nil, format: .gif(GIFPreset.high.settings)), to: cancelledGIF) { _ in }
+            }
+            try await Task.sleep(for: .milliseconds(150))
+            gifTask.cancel()
+            if case .failure(let error) = await gifTask.result {
+                check(error is CancellationError, "cancel throws CancellationError (\(type(of: error)))")
+            } else {
+                check(false, "cancel threw nothing (export finished first?)")
+            }
+            check(!FileManager.default.fileExists(atPath: cancelledGIF.path), "no partial GIF after cancel")
         } catch {
             print("ERROR \(error)")
             failures += 1
