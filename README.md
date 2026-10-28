@@ -72,6 +72,32 @@ SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" scripts/build-app.sh
 
 Other variables: `BUNDLE_ID` (default `app.tinycap.Tinycap`), `VERSION`, `BUILD_NUMBER`, `ARCHS`.
 
+### Release DMG
+
+`scripts/make-dmg.sh` builds the direct-download DMG. It does four things:
+
+- builds the universal app, signed with Developer ID and the hardened runtime
+- packages it with an Applications shortcut, then signs, notarizes and staples the DMG
+- checks the DMG with Gatekeeper
+- prints its SHA-256 for the Homebrew cask
+
+```sh
+# once: store notarization credentials in the login keychain
+xcrun notarytool store-credentials tinycap-notary --apple-id you@example.com --team-id TEAMID
+
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=tinycap-notary \
+  scripts/make-dmg.sh                 # → build/release/Tinycap-<version>.dmg (+ .sha256)
+
+scripts/make-dmg.sh --unsigned        # local test DMG, not notarized
+```
+
+The version comes from the latest `v*` git tag (or `VERSION=1.2.3`). The build number is the commit count. Release builds require `nasm`, so the Intel slice gets SIMD.
+
+Two known, harmless messages appear during the release build:
+
+- `ld: warning: no platform load command found in '…libvpx.a[x86_64](….asm.o)'`: nasm doesn't tag its object files with a macOS version, and the linker correctly assumes macOS.
+- `hdiutil: WARNING: … is deprecated`: `hdiutil create` still works; the script will move to `diskutil image` once it's verified on a release machine.
+
 ### App icon
 
 `Resources/AppIcon.icns` and `Resources/AppIcon-1024.png` are generated from the reference artwork `TinyCapIcon.png`:
