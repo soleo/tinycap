@@ -7,8 +7,6 @@ struct PreviewView: View {
     @Bindable var model: PreviewModel
     let onDiscard: () -> Void
 
-    @State private var widthText = ""
-
     var body: some View {
         VStack(spacing: 0) {
             PlayerView(player: model.player)
@@ -26,7 +24,6 @@ struct PreviewView: View {
             .disabled(model.info == nil && !isFailed)
         }
         .frame(minWidth: 560)
-        .onAppear { syncWidthText() }
     }
 
     // MARK: - Timeline
@@ -86,50 +83,134 @@ struct PreviewView: View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
                 Text("Format").gridColumnAlignment(.trailing)
-                Picker("Codec", selection: $model.codec) {
-                    ForEach(VideoCodec.allCases) { Text("MP4 · \($0.displayName)").tag($0) }
+                Picker("Format", selection: $model.format) {
+                    ForEach(ExportFormat.allCases) { Text($0.displayName).tag($0) }
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 260)
-                .help("H.264 plays everywhere. HEVC makes smaller files but some apps can't play it inline.")
+                .frame(width: 140)
             }
-            GridRow {
-                Text("Quality")
-                HStack {
-                    Text("Smaller").font(.caption).foregroundStyle(.secondary)
-                    Slider(value: $model.quality, in: 0...1)
-                        .frame(maxWidth: 220)
-                        .accessibilityLabel("Quality")
-                        .accessibilityValue("\(Int(model.quality * 100)) percent")
-                    Text("Better").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            GridRow {
-                Text("Size")
-                HStack {
-                    Picker("Size", selection: scaleChoice) {
-                        Text("Full (1×)").tag(ScaleChoice.full)
-                        Text("Half (0.5×)").tag(ScaleChoice.half)
-                        Text("Width…").tag(ScaleChoice.width)
-                    }
-                    .labelsHidden()
-                    .frame(width: 130)
-                    if case .width = model.scale {
-                        TextField("Width", text: $widthText)
-                            .frame(width: 64)
-                            .multilineTextAlignment(.trailing)
-                            .onSubmit(applyWidth)
-                            .accessibilityLabel("Output width in pixels")
-                        Text("px").foregroundStyle(.secondary)
-                    }
-                }
-            }
+            if model.format == .mp4 { mp4Options } else { gifOptions }
             GridRow {
                 Text("")
                 summary
             }
         }
+    }
+
+    @ViewBuilder
+    private var mp4Options: some View {
+        GridRow {
+            Text("Codec")
+            Picker("Codec", selection: $model.codec) {
+                ForEach(VideoCodec.allCases) { Text($0.displayName).tag($0) }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 180)
+            .help("H.264 plays everywhere. HEVC makes smaller files but some apps can't play it inline.")
+        }
+        GridRow {
+            Text("Quality")
+            HStack {
+                Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                Slider(value: $model.quality, in: 0...1)
+                    .frame(maxWidth: 220)
+                    .accessibilityLabel("Quality")
+                    .accessibilityValue("\(Int(model.quality * 100)) percent")
+                Text("Better").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        GridRow {
+            Text("Size")
+            ScalePicker(scale: $model.scale, sourceWidth: model.info.map { Int($0.pixelSize.width) })
+        }
+    }
+
+    @ViewBuilder
+    private var gifOptions: some View {
+        GridRow {
+            Text("Preset")
+            Picker("Preset", selection: presetChoice) {
+                ForEach(GIFPreset.allCases) { Text($0.displayName).tag(Optional($0)) }
+                if model.gif.preset == nil { Text("Custom").tag(GIFPreset?.none) }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 280)
+        }
+        GridRow {
+            Text("Frame rate")
+            HStack {
+                Slider(value: fpsBinding, in: Double(GIFSettings.frameRates.lowerBound)...Double(GIFSettings.frameRates.upperBound), step: 1)
+                    .frame(maxWidth: 180)
+                    .accessibilityLabel("Frame rate")
+                    .accessibilityValue("\(model.gif.fps) frames per second")
+                Text("\(model.gif.fps) fps").monospacedDigit().frame(width: 48, alignment: .leading)
+            }
+        }
+        GridRow {
+            Text("Size")
+            ScalePicker(scale: $model.gif.scale, sourceWidth: model.info.map { Int($0.pixelSize.width) })
+        }
+        GridRow {
+            Text("Colors")
+            Picker("Colors", selection: $model.gif.colors) {
+                ForEach(GIFSettings.colorChoices, id: \.self) { Text("\($0)").tag($0) }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+        }
+        GridRow {
+            Text("")
+            HStack(spacing: 14) {
+                Toggle("Dither", isOn: $model.gif.dither)
+                    .help("Smoother gradients and photos; larger files")
+                Toggle("Loop", isOn: $model.gif.loop)
+                Toggle("Drop duplicate frames", isOn: $model.gif.dropDuplicates)
+                    .help("Merge frames where nothing changed into one longer frame")
+            }
+            .toggleStyle(.checkbox)
+        }
+        GridRow {
+            Text("")
+            fitRow
+        }
+    }
+
+    private var fitRow: some View {
+        HStack(spacing: 8) {
+            Button("Fit under \(model.fitTargetMB) MB") { model.fitGIFUnderTarget() }
+                .disabled(model.fit == .fitting || model.info == nil)
+                .help("Lower dithering, colors, frame rate and size until the estimate fits")
+            switch model.fit {
+            case .idle:
+                EmptyView()
+            case .fitting:
+                ProgressView().controlSize(.small)
+                Text("Trying smaller settings…").foregroundStyle(.secondary)
+            case .fitted(let bytes):
+                Label("Fits: about \(ByteSize.format(bytes))", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case .cannotFit(let bytes):
+                Label("Smallest settings are still about \(ByteSize.format(bytes)). Trim the clip to go lower.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            }
+        }
+        .font(.callout)
+    }
+
+    private var presetChoice: Binding<GIFPreset?> {
+        Binding { model.gif.preset } set: { preset in
+            if let preset { model.applyGIFPreset(preset) }
+        }
+    }
+
+    private var fpsBinding: Binding<Double> {
+        Binding { Double(model.gif.fps) } set: { model.gif.fps = Int($0.rounded()) }
     }
 
     private var summary: some View {
@@ -151,45 +232,13 @@ struct PreviewView: View {
             case .bytes(let bytes):
                 Text("·").foregroundStyle(.tertiary)
                 Text("about \(ByteSize.format(bytes))")
-                    .help("Estimated from a 2-second sample of the kept range at these settings.")
+                    .help("Estimated by encoding a short sample of the kept range at these settings.")
             }
         }
         .monospacedDigit()
         .font(.callout)
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
-    }
-
-    private enum ScaleChoice: Hashable { case full, half, width }
-
-    private var scaleChoice: Binding<ScaleChoice> {
-        Binding {
-            switch model.scale {
-            case .full: return .full
-            case .half: return .half
-            case .width: return .width
-            }
-        } set: { choice in
-            switch choice {
-            case .full: model.scale = .full
-            case .half: model.scale = .half
-            case .width:
-                let current = model.outputSize?.width ?? 1280
-                model.scale = .width(min(1280, current))
-                syncWidthText()
-            }
-        }
-    }
-
-    private func syncWidthText() {
-        if case .width(let w) = model.scale { widthText = String(w) }
-    }
-
-    private func applyWidth() {
-        if let w = Int(widthText.trimmingCharacters(in: .whitespaces)), w >= 16 {
-            model.scale = .width(w)
-        }
-        syncWidthText()
     }
 
     // MARK: - Footer
@@ -264,5 +313,65 @@ struct PreviewView: View {
             Button("Show in Finder") { model.revealExportedFile() }
                 .keyboardShortcut(.defaultAction)
         }
+    }
+}
+
+/// Full / Half / fixed width, shared by the MP4 and GIF options.
+struct ScalePicker: View {
+    @Binding var scale: OutputScale
+    let sourceWidth: Int?
+    @State private var widthText = ""
+
+    private enum Choice: Hashable { case full, half, width }
+
+    var body: some View {
+        HStack {
+            Picker("Size", selection: choice) {
+                Text("Full (1×)").tag(Choice.full)
+                Text("Half (0.5×)").tag(Choice.half)
+                Text("Width…").tag(Choice.width)
+            }
+            .labelsHidden()
+            .frame(width: 130)
+            if case .width = scale {
+                TextField("Width", text: $widthText)
+                    .frame(width: 64)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit(apply)
+                    .accessibilityLabel("Output width in pixels")
+                Text("px").foregroundStyle(.secondary)
+            }
+        }
+        .onAppear(perform: sync)
+        .onChange(of: scale) { _, _ in sync() }
+    }
+
+    private var choice: Binding<Choice> {
+        Binding {
+            switch scale {
+            case .full: return .full
+            case .half: return .half
+            case .width: return .width
+            }
+        } set: { newValue in
+            switch newValue {
+            case .full: scale = .full
+            case .half: scale = .half
+            case .width:
+                if case .width = scale { return }
+                scale = .width(min(1280, sourceWidth ?? 1280))
+            }
+        }
+    }
+
+    private func sync() {
+        if case .width(let w) = scale { widthText = String(w) }
+    }
+
+    private func apply() {
+        if let w = Int(widthText.trimmingCharacters(in: .whitespaces)), w >= 16 {
+            scale = .width(w)
+        }
+        sync()
     }
 }

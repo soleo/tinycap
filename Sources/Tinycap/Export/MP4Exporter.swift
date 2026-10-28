@@ -8,7 +8,11 @@ import VideoToolbox
 struct MP4Exporter: Exporter {
     let fileExtension = "mp4"
     static let keyframeSeconds = 2.0
-    var samplePieceLength: Double { Self.keyframeSeconds }
+
+    func estimateSize(master: URL, options: ExportOptions, start: Double, end: Double) async throws -> Int64 {
+        try await SizeEstimator.estimate(exporter: self, master: master, options: options,
+                                         pieceLength: Self.keyframeSeconds, start: start, end: end)
+    }
 
     func export(
         master: URL,
@@ -16,6 +20,7 @@ struct MP4Exporter: Exporter {
         to destination: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
+        guard case .mp4(let settings) = options.format else { throw ExportError.wrongFormat }
         let asset = AVURLAsset(url: master)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw ExportError.noVideoTrack }
         let (naturalSize, nominalFPS, transform) = try await track.load(.naturalSize, .nominalFrameRate, .preferredTransform)
@@ -32,8 +37,8 @@ struct MP4Exporter: Exporter {
         reader.add(output)
 
         let fps = nominalFPS > 0 ? Double(nominalFPS) : 30
-        let size = options.settings.outputSize(for: naturalSize)
-        let bitrate = options.settings.bitrate(width: size.width, height: size.height, frameRate: fps)
+        let size = settings.outputSize(for: naturalSize)
+        let bitrate = settings.bitrate(width: size.width, height: size.height, frameRate: fps)
         var compression: [String: Any] = [
             AVVideoAverageBitRateKey: bitrate,
             AVVideoExpectedSourceFrameRateKey: fps,
@@ -41,7 +46,7 @@ struct MP4Exporter: Exporter {
             AVVideoMaxKeyFrameIntervalDurationKey: Self.keyframeSeconds,
             AVVideoAllowFrameReorderingKey: true,
         ]
-        if options.settings.codec == .h264 {
+        if settings.codec == .h264 {
             compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
         } else {
             compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel as String
@@ -51,7 +56,7 @@ struct MP4Exporter: Exporter {
         let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
         writer.shouldOptimizeForNetworkUse = true // moov first: plays while loading in Slack/GitHub
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: options.settings.codec == .hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoCodecKey: settings.codec == .hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
             AVVideoWidthKey: size.width,
             AVVideoHeightKey: size.height,
             AVVideoScalingModeKey: AVVideoScalingModeResizeAspect,

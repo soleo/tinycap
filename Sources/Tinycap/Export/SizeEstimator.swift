@@ -1,18 +1,19 @@
 import AVFoundation
 import TinycapCore
 
-/// Live file-size estimate (EX-4): encodes two keyframe-interval-long pieces of the
+/// Sampled file-size estimate (EX-4) for video formats: encodes two pieces of the
 /// actual clip with the real exporter and scales the result to the kept length.
-/// Works for any `Exporter`.
+/// Pieces should be one keyframe interval long (see `SizeSampling`).
 enum SizeEstimator {
     static func estimate(
         exporter: Exporter,
         master: URL,
-        settings: ExportSettings,
+        options: ExportOptions,
+        pieceLength: Double,
         start: Double,
         end: Double
     ) async throws -> Int64 {
-        let measured = try await sample(exporter: exporter, master: master, settings: settings, start: start, end: end)
+        let measured = try await sample(exporter: exporter, master: master, options: options, pieceLength: pieceLength, start: start, end: end)
         return SizeSampling.extrapolate(sampleBytes: measured.bytes, sampleSeconds: measured.seconds, totalSeconds: end - start)
     }
 
@@ -20,11 +21,12 @@ enum SizeEstimator {
     static func sample(
         exporter: Exporter,
         master: URL,
-        settings: ExportSettings,
+        options: ExportOptions,
+        pieceLength: Double,
         start: Double,
         end: Double
     ) async throws -> (bytes: Int64, seconds: Double) {
-        let windows = SizeSampling.windows(start: start, end: end, pieceLength: exporter.samplePieceLength)
+        let windows = SizeSampling.windows(start: start, end: end, pieceLength: pieceLength)
         guard !windows.isEmpty else { return (0, 0) }
 
         let folder = FileManager.default.temporaryDirectory
@@ -37,11 +39,9 @@ enum SizeEstimator {
         for (i, window) in windows.enumerated() {
             try Task.checkCancellation()
             let out = folder.appendingPathComponent("sample\(i)").appendingPathExtension(exporter.fileExtension)
-            let range = CMTimeRange(
-                start: CMTime(seconds: window.lowerBound, preferredTimescale: 600),
-                end: CMTime(seconds: window.upperBound, preferredTimescale: 600)
-            )
-            try await exporter.export(master: master, options: ExportOptions(timeRange: range, settings: settings), to: out) { _ in }
+            var piece = options
+            piece.timeRange = CMTimeRange(seconds: window.lowerBound, window.upperBound)
+            try await exporter.export(master: master, options: piece, to: out) { _ in }
             bytes += try await mediaBytes(of: out)
             seconds += window.upperBound - window.lowerBound
         }

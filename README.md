@@ -6,7 +6,7 @@ Requires macOS 15 Sequoia or later. MIT licensed.
 
 ## Status
 
-Milestones 1 (capture) and 2 (preview and MP4 export) are in place.
+Milestones 1 (capture), 2 (preview and MP4 export) and 3 (GIF export) are in place.
 
 **Capture**
 - Menu-bar app with no Dock icon: Record Window, Record Screen, Record Area, Open Recent, Settings, Quit. Opening the app again while it runs shows a small window with the record buttons.
@@ -20,15 +20,26 @@ Milestones 1 (capture) and 2 (preview and MP4 export) are in place.
 - On stop, a preview window plays the clip
 - Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
 - MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
+- GIF with presets (Small, Balanced, High), frame rate 5–30, size, 32–256 colors, ordered dithering, loop, duplicate-frame dropping, and "Fit under N MB"
+- File-size estimate from a short sample encode, for MP4 and GIF
 - After export: Copy (paste the file into Slack, Mail, Finder), Show in Finder, or drag the file out
 - Closing an unexported recording asks first; recordings left by a quit or crash are offered again at the next launch
 
 **Settings**
 - General: launch at login, save folder, file name pattern, editable global shortcuts (defaults ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop)
 - Recording: frame rate, cursor, Retina
-- Export: codec, quality and size the preview starts with
+- Export: default format, MP4 codec/quality/size, GIF preset, loop and fit target
 
-Next: GIF export (M3), WebM export (M4), countdown, click highlights and release packaging (M5).
+Next: WebM export (M4), countdown, click highlights and release packaging (M5).
+
+### How GIFs stay small
+
+Tinycap has its own GIF encoder (`Sources/TinycapCore/GIFEncoder.swift`), written for screen recordings and free of license constraints (gifski is AGPL, which doesn't fit the MIT license or the App Store):
+
+- One palette for the whole clip, built by median cut from frames across the kept range, so colors don't flicker.
+- After the first frame, each frame stores only the box that changed, with unchanged pixels transparent.
+- Frames where nothing changed are merged into one longer frame.
+- Optional ordered dithering, which stays still between frames instead of shimmering.
 
 ## Build
 
@@ -36,7 +47,7 @@ Next: GIF export (M3), WebM export (M4), countdown, click highlights and release
 scripts/build-app.sh            # release, universal (arm64 + x86_64) → build/Tinycap.app
 CONFIG=debug scripts/build-app.sh
 scripts/test.sh                 # unit tests for TinycapCore
-scripts/export-check.sh         # encodes a synthetic recording: trim, scale, codecs, file size, cancel
+scripts/export-check.sh         # encodes a synthetic recording to MP4 and GIF: trim, scale, codecs, sizes, estimates, cancel
 open build/Tinycap.app
 ```
 
@@ -66,13 +77,13 @@ The script removes the light backdrop around the tile, centers it on Apple's 824
 
 | Path | What it holds |
 | --- | --- |
-| `Sources/TinycapCore` | Pure logic with unit tests: coordinate conversion, resize handles, file naming, settings |
+| `Sources/TinycapCore` | Pure logic with unit tests: geometry, file naming, settings, size sampling, GIF palette and encoder |
 | `Sources/Tinycap/App` | Entry point, menu-bar item, settings, onboarding, save folder |
 | `Sources/Tinycap/Selection` | Area, window and screen pickers; recording outline |
 | `Sources/Tinycap/Capture` | `ScreenRecorder` (ScreenCaptureKit) |
 | `Sources/Tinycap/Recording` | `RecordingCoordinator`: select → record → stop → preview |
 | `Sources/Tinycap/Editor` | Preview window: player, trim scrubber, export controls |
-| `Sources/Tinycap/Export` | `Exporter` protocol and the MP4 exporter (AVAssetReader → AVAssetWriter) |
+| `Sources/Tinycap/Export` | `Exporter` protocol, MP4 exporter (AVAssetReader → AVAssetWriter), GIF exporter (decode → vImage scale → `GIFEncoder`), size estimates |
 | `Sources/Tinycap/Hotkeys` | Global shortcuts via Carbon `RegisterEventHotKey`, shortcut recorder |
 | `Resources` | Info.plist, entitlements, icon |
 

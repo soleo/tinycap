@@ -1,35 +1,64 @@
 import AVFoundation
 import TinycapCore
 
+/// Format and its options for one export.
+enum FormatSettings: Sendable, Equatable {
+    case mp4(ExportSettings)
+    case gif(GIFSettings)
+
+    var format: ExportFormat {
+        switch self {
+        case .mp4: return .mp4
+        case .gif: return .gif
+        }
+    }
+
+    func outputSize(for source: CGSize) -> (width: Int, height: Int) {
+        switch self {
+        case .mp4(let s): return s.outputSize(for: source)
+        case .gif(let s): return s.outputSize(for: source)
+        }
+    }
+}
+
 /// What to export from a master recording.
 struct ExportOptions: Sendable {
     /// Part of the master to keep; nil exports all of it.
     var timeRange: CMTimeRange?
-    var settings: ExportSettings
+    var format: FormatSettings
 }
 
-/// Turns the master .mov into a shareable file. One type per format (MP4 now;
-/// GIF in M3, WebM in M4).
+/// Turns the master .mov into a shareable file. One type per format (MP4, GIF; WebM in M4).
 protocol Exporter: Sendable {
     var fileExtension: String { get }
-    /// Length of each piece the size estimator encodes. For video codecs this is the
-    /// keyframe interval, so a piece costs what the same stretch of a full export does.
-    var samplePieceLength: Double { get }
     func export(
         master: URL,
         options: ExportOptions,
         to destination: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws
+    /// Expected file size for exporting start…end with `options` (EX-4).
+    func estimateSize(master: URL, options: ExportOptions, start: Double, end: Double) async throws -> Int64
+}
+
+enum Exporters {
+    static func exporter(for format: ExportFormat) -> Exporter {
+        switch format {
+        case .mp4: return MP4Exporter()
+        case .gif: return GIFExporter()
+        }
+    }
 }
 
 enum ExportError: LocalizedError {
     case noVideoTrack
+    case wrongFormat
     case cannotEncode(String)
 
     var errorDescription: String? {
         switch self {
         case .noVideoTrack: return "The recording has no video."
+        case .wrongFormat: return "Internal error: options don't match the exporter."
         case .cannotEncode(let reason): return "Tinycap couldn't encode the video: \(reason)"
         }
     }
@@ -52,5 +81,11 @@ struct MasterInfo: Sendable {
             pixelSize: size,
             frameRate: fps > 0 ? Double(fps) : 30
         )
+    }
+}
+
+extension CMTimeRange {
+    init(seconds start: Double, _ end: Double) {
+        self.init(start: CMTime(seconds: start, preferredTimescale: 600), end: CMTime(seconds: end, preferredTimescale: 600))
     }
 }

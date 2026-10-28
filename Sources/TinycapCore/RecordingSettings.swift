@@ -21,6 +21,14 @@ public enum PreferenceKey {
     public static let exportCodec = "export.codec"
     public static let exportQuality = "export.quality"
     public static let exportScale = "export.scale"
+    public static let exportFormat = "export.format"
+    public static let gifFPS = "gif.fps"
+    public static let gifScale = "gif.scale"
+    public static let gifColors = "gif.colors"
+    public static let gifDither = "gif.dither"
+    public static let gifLoop = "gif.loop"
+    public static let gifDropDuplicates = "gif.dropDuplicates"
+    public static let gifFitTargetMB = "gif.fitTargetMB"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [
@@ -31,6 +39,8 @@ public enum PreferenceKey {
             exportCodec: VideoCodec.h264.rawValue,
             exportQuality: ExportSettings.defaultQuality,
             exportScale: OutputScale.full.storageValue,
+            exportFormat: ExportFormat.mp4.rawValue,
+            gifFitTargetMB: 10,
         ])
     }
 }

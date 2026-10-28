@@ -140,38 +140,79 @@ private struct RecordingSettingsView: View {
 }
 
 private struct ExportSettingsView: View {
+    @AppStorage(PreferenceKey.exportFormat) private var format = ExportFormat.mp4.rawValue
     @AppStorage(PreferenceKey.exportCodec) private var codec = VideoCodec.h264.rawValue
     @AppStorage(PreferenceKey.exportQuality) private var quality = ExportSettings.defaultQuality
     @AppStorage(PreferenceKey.exportScale) private var scale = OutputScale.full.storageValue
+    @AppStorage(PreferenceKey.gifFitTargetMB) private var fitTargetMB = 10
+    @State private var gif = GIFSettings(defaults: .standard)
 
     var body: some View {
         Form {
-            LabeledContent("Format", value: "MP4")
-            Picker("MP4 codec", selection: $codec) {
-                ForEach(VideoCodec.allCases) { Text($0.displayName).tag($0.rawValue) }
+            Picker("Default format", selection: $format) {
+                ForEach(ExportFormat.allCases) { Text($0.displayName).tag($0.rawValue) }
             }
-            Text("H.264 plays inline almost everywhere. HEVC makes smaller files, but some apps won't play it inline.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            LabeledContent("Quality") {
-                HStack {
-                    Text("Smaller").font(.caption).foregroundStyle(.secondary)
-                    Slider(value: $quality, in: 0...1).accessibilityLabel("Quality")
-                    Text("Better").font(.caption).foregroundStyle(.secondary)
+
+            Section("MP4") {
+                Picker("Codec", selection: $codec) {
+                    ForEach(VideoCodec.allCases) { Text($0.displayName).tag($0.rawValue) }
+                }
+                Text("H.264 plays inline almost everywhere. HEVC makes smaller files, but some apps won't play it inline.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LabeledContent("Quality") {
+                    HStack {
+                        Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: $quality, in: 0...1).accessibilityLabel("Quality")
+                        Text("Better").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Picker("Size", selection: $scale) {
+                    Text("Full (1×)").tag(OutputScale.full.storageValue)
+                    Text("Half (0.5×)").tag(OutputScale.half.storageValue)
+                    Text("1280 px wide").tag(OutputScale.width(1280).storageValue)
+                    if case .width(let w) = OutputScale(storageValue: scale), w != 1280 {
+                        Text("\(w) px wide").tag(scale)
+                    }
                 }
             }
-            Picker("Size", selection: $scale) {
-                Text("Full (1×)").tag(OutputScale.full.storageValue)
-                Text("Half (0.5×)").tag(OutputScale.half.storageValue)
-                Text("1280 px wide").tag(OutputScale.width(1280).storageValue)
-                if case .width(let w) = OutputScale(storageValue: scale), w != 1280 {
-                    Text("\(w) px wide").tag(scale)
+
+            Section("GIF") {
+                Picker("Preset", selection: presetBinding) {
+                    ForEach(GIFPreset.allCases) { preset in
+                        Text("\(preset.displayName) — \(describe(preset.settings))").tag(Optional(preset))
+                    }
+                    if gif.preset == nil { Text("Custom — \(describe(gif))").tag(GIFPreset?.none) }
                 }
+                Toggle("Loop", isOn: Binding(get: { gif.loop }, set: { gif.loop = $0; gif.save(to: .standard) }))
+                Stepper("Fit under \(fitTargetMB) MB", value: $fitTargetMB, in: 1...100)
             }
+
             Text("These are the starting values in the preview window. Changes made there are remembered here.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
+        .onAppear { gif = GIFSettings(defaults: .standard) }
+    }
+
+    private var presetBinding: Binding<GIFPreset?> {
+        Binding { gif.preset } set: { preset in
+            guard let preset else { return }
+            var s = preset.settings
+            s.loop = gif.loop
+            gif = s
+            gif.save(to: .standard)
+        }
+    }
+
+    private func describe(_ s: GIFSettings) -> String {
+        let size: String
+        switch s.scale {
+        case .full: size = "full size"
+        case .half: size = "half size"
+        case .width(let w): size = "\(w) px"
+        }
+        return "\(s.fps) fps, \(size), \(s.colors) colors\(s.dither ? ", dithered" : "")"
     }
 }
