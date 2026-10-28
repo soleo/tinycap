@@ -6,7 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: RecordingCoordinator!
     private var statusItem: StatusItemController!
     private var controlWindow: ControlWindowController!
-    private let hotKeys = HotKeyCenter()
     private let settingsWindow = SettingsWindowController()
     private let onboarding = OnboardingWindowController()
 
@@ -26,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if !Permissions.hasScreenRecordingAccess {
             onboarding.show()
+        } else {
+            coordinator.offerUnsavedRecordings()
         }
     }
 
@@ -40,16 +41,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func registerHotKeys() {
-        for shortcut in Shortcut.allCases {
-            hotKeys.register(shortcut.hotKey) { [weak self] in
-                guard let self else { return }
-                switch shortcut {
-                case .recordArea: self.coordinator.begin(.area)
-                case .recordWindow: self.coordinator.begin(.window)
-                case .recordScreen: self.coordinator.begin(.screen)
-                case .stop: self.coordinator.stop()
-                }
+        let manager = ShortcutManager.shared
+        manager.handler = { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .recordArea: self.coordinator.begin(.area)
+            case .recordWindow: self.coordinator.begin(.window)
+            case .recordScreen: self.coordinator.begin(.screen)
+            case .stop: self.coordinator.stop()
             }
         }
+        manager.reload()
     }
 }

@@ -64,7 +64,8 @@ private struct ControlView: View {
                 button(.recordScreen, mode: .screen)
             }
             HStack {
-                Text("Stop: \(Shortcut.stop.hotKey.displayString)").monospaced().font(.caption).foregroundStyle(.secondary)
+                Text("Stop: \(ShortcutManager.shared.combo(for: .stop)?.displayString ?? "click the menu-bar timer")")
+                    .monospaced().font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Settings…", action: openSettings)
             }
@@ -73,13 +74,14 @@ private struct ControlView: View {
         .frame(width: 440)
     }
 
-    private func button(_ shortcut: Shortcut, mode: CaptureMode) -> some View {
+    private func button(_ action: ShortcutAction, mode: CaptureMode) -> some View {
         Button {
             record(mode)
         } label: {
             VStack(spacing: 2) {
-                Text(shortcut.title)
-                Text(shortcut.hotKey.displayString).font(.caption).monospaced().foregroundStyle(.secondary)
+                Text(action.title)
+                Text(ShortcutManager.shared.combo(for: action)?.displayString ?? " ")
+                    .font(.caption).monospaced().foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }

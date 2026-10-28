@@ -2,7 +2,7 @@ import AppKit
 import ScreenCaptureKit
 import TinycapCore
 
-/// Runs one recording end to end: select → record → stop → save.
+/// Runs one recording end to end: select → record → stop → preview.
 @MainActor
 final class RecordingCoordinator {
     enum State: Equatable {
@@ -19,9 +19,9 @@ final class RecordingCoordinator {
     var onStateChange: ((State) -> Void)?
 
     private let recorder = ScreenRecorder()
-    private let exporter: Exporter = MP4Exporter()
     private let onNeedsPermission: () -> Void
     private var border: RecordingBorderWindow?
+    private var previews: [PreviewWindowController] = []
 
     init(onNeedsPermission: @escaping () -> Void) {
         self.onNeedsPermission = onNeedsPermission
@@ -104,12 +104,15 @@ final class RecordingCoordinator {
         state = .recording(startedAt: Date())
     }
 
-    /// Masters live in Application Support so a crash leaves them recoverable.
-    private static func newMasterURL() throws -> URL {
+    /// Masters live in Application Support so a crash or quit leaves them recoverable.
+    private static var mastersFolder: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let folder = support.appendingPathComponent("Tinycap/Recordings", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+        return support.appendingPathComponent("Tinycap/Recordings", isDirectory: true)
+    }
+
+    private static func newMasterURL() throws -> URL {
+        try FileManager.default.createDirectory(at: mastersFolder, withIntermediateDirectories: true)
+        return mastersFolder.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
     }
 
     // MARK: - Stop
@@ -121,52 +124,52 @@ final class RecordingCoordinator {
         border = nil
 
         Task {
-            let master: URL
             do {
-                master = try await recorder.stop()
+                let master = try await recorder.stop()
+                state = .idle
+                openPreview(master)
             } catch {
                 state = .idle
                 present(error, title: "Tinycap couldn't finish the recording")
-                return
-            }
-            do {
-                let destination = try await save(master)
-                try? FileManager.default.removeItem(at: master)
-                RecentRecordings.add(destination)
-                state = .idle
-                NSWorkspace.shared.activateFileViewerSelecting([destination])
-            } catch {
-                state = .idle
-                presentSaveFailure(error, master: master)
             }
         }
     }
 
-    /// The master is kept when export fails, so the clip is never lost.
-    private func presentSaveFailure(_ error: Error, master: URL) {
+    // MARK: - Preview
+
+    private func openPreview(_ master: URL) {
+        let controller = PreviewWindowController(master: master) { [weak self] closed in
+            self?.previews.removeAll { $0 === closed }
+        }
+        previews.append(controller)
+        controller.show()
+    }
+
+    /// Masters left behind by a quit or crash (RC reliability). Offered once at launch.
+    func offerUnsavedRecordings() {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: Self.mastersFolder, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        let masters = files.filter { $0.pathExtension == "mov" }
+        guard !masters.isEmpty else { return }
+
         let alert = NSAlert()
-        alert.messageText = "Tinycap couldn't save the recording"
-        alert.informativeText = error.localizedDescription
-            + "\n\nThe original recording was kept. You can choose another save folder in Settings."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Show Recording")
-        alert.addButton(withTitle: "OK")
+        alert.messageText = masters.count == 1
+            ? "Tinycap found a recording that wasn't exported"
+            : "Tinycap found \(masters.count) recordings that weren't exported"
+        alert.informativeText = "Open them to trim and export, or delete them."
+        alert.addButton(withTitle: masters.count == 1 ? "Open" : "Open All")
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Later")
         NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.activateFileViewerSelecting([master])
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            masters.prefix(5).forEach(openPreview)
+        case .alertSecondButtonReturn:
+            masters.forEach { try? FileManager.default.removeItem(at: $0) }
+        default:
+            break
         }
-    }
-
-    private func save(_ master: URL) async throws -> URL {
-        let folder = try SaveLocation.shared.preparedFolder()
-        let pattern = FilenamePattern(UserDefaults.standard.string(forKey: PreferenceKey.filenamePattern) ?? "")
-        let destination = FilenamePattern.uniqueURL(
-            in: folder,
-            baseName: pattern.baseName(for: Date()),
-            pathExtension: exporter.fileExtension
-        )
-        try await exporter.export(master: master, timeRange: nil, to: destination)
-        return destination
     }
 
     // MARK: - Errors

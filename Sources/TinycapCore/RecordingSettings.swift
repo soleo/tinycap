@@ -18,6 +18,9 @@ public enum PreferenceKey {
     public static let filenamePattern = "export.filenamePattern"
     public static let saveFolderBookmark = "export.saveFolderBookmark"
     public static let recentRecordings = "recents.paths"
+    public static let exportCodec = "export.codec"
+    public static let exportQuality = "export.quality"
+    public static let exportScale = "export.scale"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [
@@ -25,6 +28,9 @@ public enum PreferenceKey {
             showsCursor: true,
             captureAtNativeScale: true,
             filenamePattern: FilenamePattern.defaultPattern,
+            exportCodec: VideoCodec.h264.rawValue,
+            exportQuality: ExportSettings.defaultQuality,
+            exportScale: OutputScale.full.storageValue,
         ])
     }
 }

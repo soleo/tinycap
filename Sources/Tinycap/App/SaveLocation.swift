@@ -26,6 +26,13 @@ final class SaveLocation {
         return url
     }
 
+    /// A new, unused file URL in the save folder named by the user's filename pattern.
+    func nextDestination(pathExtension: String, date: Date = Date()) throws -> URL {
+        let folder = try preparedFolder()
+        let pattern = FilenamePattern(defaults.string(forKey: PreferenceKey.filenamePattern) ?? "")
+        return FilenamePattern.uniqueURL(in: folder, baseName: pattern.baseName(for: date), pathExtension: pathExtension)
+    }
+
     func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
