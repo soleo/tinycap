@@ -74,6 +74,7 @@ final class ScreenRecorder: NSObject {
         config.height = pixels.height
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.frameRate.rawValue))
         config.showsCursor = settings.showsCursor
+        config.showMouseClicks = settings.highlightsClicks
         config.capturesAudio = false
         config.captureResolution = settings.captureAtNativeScale ? .best : .nominal
         config.queueDepth = 6

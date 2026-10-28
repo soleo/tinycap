@@ -15,6 +15,9 @@ public enum PreferenceKey {
     public static let frameRate = "recording.frameRate"
     public static let showsCursor = "recording.showsCursor"
     public static let captureAtNativeScale = "recording.captureAtNativeScale"
+    public static let highlightsClicks = "recording.highlightsClicks"
+    public static let countdown = "recording.countdown"
+    public static let lastError = "diagnostics.lastError"
     public static let filenamePattern = "export.filenamePattern"
     public static let saveFolderBookmark = "export.saveFolderBookmark"
     public static let recentRecordings = "recents.paths"
@@ -37,6 +40,8 @@ public enum PreferenceKey {
             frameRate: FrameRate.default.rawValue,
             showsCursor: true,
             captureAtNativeScale: true,
+            highlightsClicks: false,
+            countdown: false,
             filenamePattern: FilenamePattern.defaultPattern,
             exportCodec: VideoCodec.h264.rawValue,
             exportQuality: ExportSettings.defaultQuality,
@@ -53,18 +58,32 @@ public struct RecordingSettings: Sendable, Equatable {
     public var showsCursor: Bool
     /// Capture at the display's Retina scale (true) or at 1× (false).
     public var captureAtNativeScale: Bool
+    /// Draw a ring at each mouse click (RC-4).
+    public var highlightsClicks: Bool
+    /// Show a 3-2-1 countdown before capture begins (MB, optional).
+    public var countdown: Bool
 
-    public init(frameRate: FrameRate = .default, showsCursor: Bool = true, captureAtNativeScale: Bool = true) {
+    public init(
+        frameRate: FrameRate = .default,
+        showsCursor: Bool = true,
+        captureAtNativeScale: Bool = true,
+        highlightsClicks: Bool = false,
+        countdown: Bool = false
+    ) {
         self.frameRate = frameRate
         self.showsCursor = showsCursor
         self.captureAtNativeScale = captureAtNativeScale
+        self.highlightsClicks = highlightsClicks
+        self.countdown = countdown
     }
 
     public init(defaults: UserDefaults) {
         self.init(
             frameRate: FrameRate(rawValue: defaults.integer(forKey: PreferenceKey.frameRate)) ?? .default,
             showsCursor: defaults.object(forKey: PreferenceKey.showsCursor) as? Bool ?? true,
-            captureAtNativeScale: defaults.object(forKey: PreferenceKey.captureAtNativeScale) as? Bool ?? true
+            captureAtNativeScale: defaults.object(forKey: PreferenceKey.captureAtNativeScale) as? Bool ?? true,
+            highlightsClicks: defaults.bool(forKey: PreferenceKey.highlightsClicks),
+            countdown: defaults.bool(forKey: PreferenceKey.countdown)
         )
     }
 }

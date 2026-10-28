@@ -30,6 +30,8 @@ struct SettingsView: View {
                 .tabItem { Label("Recording", systemImage: "record.circle") }
             ExportSettingsView()
                 .tabItem { Label("Export", systemImage: "square.and.arrow.up") }
+            AboutSettingsView()
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
@@ -94,12 +96,6 @@ private struct GeneralSettingsView: View {
                         .controlSize(.small)
                 }
             }
-
-            Section {
-                LabeledContent("Tinycap is open source under the MIT license.") {
-                    Button("Acknowledgements…") { AcknowledgementsWindowController.shared.show() }
-                }
-            }
         }
         .formStyle(.grouped)
     }
@@ -127,6 +123,8 @@ private struct RecordingSettingsView: View {
     @AppStorage(PreferenceKey.frameRate) private var frameRate = FrameRate.default.rawValue
     @AppStorage(PreferenceKey.showsCursor) private var showsCursor = true
     @AppStorage(PreferenceKey.captureAtNativeScale) private var nativeScale = true
+    @AppStorage(PreferenceKey.highlightsClicks) private var highlightsClicks = false
+    @AppStorage(PreferenceKey.countdown) private var countdown = false
 
     var body: some View {
         Form {
@@ -136,10 +134,51 @@ private struct RecordingSettingsView: View {
                 }
             }
             Toggle("Show cursor", isOn: $showsCursor)
+            Toggle("Highlight clicks", isOn: $highlightsClicks)
+            Toggle("Count down 3-2-1 before recording", isOn: $countdown)
             Toggle("Record at Retina resolution", isOn: $nativeScale)
             Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct AboutSettingsView: View {
+    @State private var copied = false
+    private let info = Diagnostics.current
+
+    var body: some View {
+        Form {
+            LabeledContent("Version", value: "\(info.appVersion) (\(info.build))")
+            LabeledContent("Installed from", value: info.channel == .appStore ? "App Store" : "Direct download")
+
+            Section {
+                LabeledContent("Found a problem?") {
+                    Button("Report a Bug…") { Diagnostics.open(.bug) }
+                }
+                LabeledContent("Have an idea?") {
+                    Button("Send Feedback…") { Diagnostics.open(.feature) }
+                }
+                LabeledContent("Version and last error, for pasting into an issue") {
+                    Button(copied ? "Copied" : "Copy Diagnostics") {
+                        Diagnostics.copyToPasteboard()
+                        copied = true
+                    }
+                }
+            } footer: {
+                Text("These open GitHub in your browser, with your Tinycap and macOS versions filled in. Tinycap sends nothing itself; you review and submit the issue.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(Diagnostics.repositoryURL == nil)
+
+            Section {
+                LabeledContent("Tinycap is open source under the MIT license.") {
+                    Button("Acknowledgements…") { AcknowledgementsWindowController.shared.show() }
+                }
+            }
         }
         .formStyle(.grouped)
     }

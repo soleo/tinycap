@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License. Tinycap contributors.</string>
+	<key>TinycapRepositoryURL</key>
+	<string>https://github.com/soleo/tinycap</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

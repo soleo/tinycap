@@ -109,6 +109,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
+        menu.addItem(.separator())
+        let bug = NSMenuItem(title: "Report a Bug…", action: #selector(reportBug), keyEquivalent: "")
+        bug.target = self
+        menu.addItem(bug)
+        let feedback = NSMenuItem(title: "Send Feedback…", action: #selector(sendFeedback), keyEquivalent: "")
+        feedback.target = self
+        menu.addItem(feedback)
+        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Tinycap", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
     }
@@ -160,6 +168,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func clearRecents() {
         RecentRecordings.clear()
+    }
+
+    @objc private func reportBug() {
+        Diagnostics.open(.bug)
+    }
+
+    @objc private func sendFeedback() {
+        Diagnostics.open(.feature)
     }
 
     @objc private func showSettings() {

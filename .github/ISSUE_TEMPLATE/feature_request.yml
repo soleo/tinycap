@@ -1,0 +1,20 @@
+name: Feedback or feature request
+description: An idea, a missing feature, or something that could work better.
+labels: ["feedback"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task or situation, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+  # Prefilled by Tinycap (menu bar → Send Feedback…).
+  - type: input
+    id: app-version
+    attributes:
+      label: Tinycap version

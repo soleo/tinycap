@@ -44,11 +44,18 @@ final class RecordingCoordinator {
                 // Fail before recording, not after, if the save folder isn't writable.
                 _ = try SaveLocation.shared.preparedFolder()
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let (target, borderRect) = await select(mode, content: content) else {
+                guard let selection = await select(mode, content: content) else {
                     state = .idle
                     return
                 }
-                try await startRecording(target, content: content, borderRect: borderRect)
+                let settings = RecordingSettings(defaults: .standard)
+                if settings.countdown, let rect = selection.countdownRect {
+                    guard await CountdownController().run(over: rect) else {
+                        state = .idle
+                        return
+                    }
+                }
+                try await startRecording(selection.target, settings: settings, content: content, borderRect: selection.borderRect)
             } catch {
                 state = .idle
                 if Permissions.isPermissionError(error) {
@@ -61,37 +68,53 @@ final class RecordingCoordinator {
         }
     }
 
-    private func select(_ mode: CaptureMode, content: SCShareableContent) async -> (CaptureTarget, CGRect?)? {
+    /// What the user picked, plus where to draw the border and the countdown
+    /// (both in AppKit global coordinates).
+    private struct Selection {
+        var target: CaptureTarget
+        var borderRect: CGRect?
+        var countdownRect: CGRect?
+    }
+
+    private func select(_ mode: CaptureMode, content: SCShareableContent) async -> Selection? {
         switch mode {
         case .area:
             guard let selection = await AreaSelectionController().run(),
                   let display = content.displays.first(where: { $0.displayID == selection.displayID })
             else { return nil }
             let local = Geometry.displayLocalRect(selection.globalRect, screenFrame: selection.screenFrame)
-            return (.area(display, rect: local), selection.globalRect)
+            return Selection(target: .area(display, rect: local), borderRect: selection.globalRect, countdownRect: selection.globalRect)
 
         case .window:
             guard let windowID = await WindowPickerController(content: content).run(),
                   let window = content.windows.first(where: { $0.windowID == windowID })
             else { return nil }
-            return (.window(window), nil)
+            let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+            let frame = Geometry.appKitRect(fromCG: window.frame, primaryScreenHeight: primaryHeight)
+            return Selection(target: .window(window), countdownRect: frame)
 
         case .screen:
             guard let displayID = await ScreenPickerController().run(),
                   let display = content.displays.first(where: { $0.displayID == displayID })
             else { return nil }
-            return (.display(display), nil)
+            let frame = NSScreen.screens.first { $0.displayID == displayID }?.frame
+            return Selection(target: .display(display), countdownRect: frame)
         }
     }
 
-    private func startRecording(_ target: CaptureTarget, content: SCShareableContent, borderRect: CGRect?) async throws {
+    private func startRecording(
+        _ target: CaptureTarget,
+        settings: RecordingSettings,
+        content: SCShareableContent,
+        borderRect: CGRect?
+    ) async throws {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let ownApp = content.applications.first { $0.processID == ownPID }
         let master = try Self.newMasterURL()
 
         try await recorder.start(
             target: target,
-            settings: RecordingSettings(defaults: .standard),
+            settings: settings,
             excludingApp: ownApp,
             outputURL: master
         )
@@ -175,6 +198,7 @@ final class RecordingCoordinator {
     // MARK: - Errors
 
     private func present(_ error: Error, title: String) {
+        Diagnostics.record(error, context: title)
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = error.localizedDescription

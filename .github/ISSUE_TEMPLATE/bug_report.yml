@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in Tinycap doesn't work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If you opened this from Tinycap (menu bar → Report a Bug…),
+        the version fields below are already filled in. Tinycap sends nothing on its own;
+        only what you submit here is shared.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Record Area
+        2. …
+  - type: dropdown
+    id: format
+    attributes:
+      label: Export format, if relevant
+      options:
+        - Not about export
+        - MP4
+        - GIF
+        - WebM
+  # The ids below are the query keys Tinycap prefills (TinycapCore/Feedback.swift).
+  - type: input
+    id: app-version
+    attributes:
+      label: Tinycap version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build
+  - type: input
+    id: channel
+    attributes:
+      label: Installed from
+      description: "appstore or direct"
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.1"
+    validations:
+      required: true
+  - type: input
+    id: chip
+    attributes:
+      label: Mac chip
+      placeholder: "M2 Pro"
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Optional. Settings → About → Copy Diagnostics, then paste here.
+      render: text
