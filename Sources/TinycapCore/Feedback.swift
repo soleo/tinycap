@@ -13,13 +13,48 @@ public struct DiagnosticInfo: Sendable, Equatable {
     public var macOS: String
     public var chip: String
     public var channel: DistributionChannel
+    /// Short git SHA the build came from, possibly with a "-dirty" suffix.
+    public var commit: String?
+    public var buildDate: Date?
 
-    public init(appVersion: String, build: String, macOS: String, chip: String, channel: DistributionChannel) {
+    public init(
+        appVersion: String, build: String, macOS: String, chip: String, channel: DistributionChannel,
+        commit: String? = nil, buildDate: Date? = nil
+    ) {
         self.appVersion = appVersion
         self.build = build
         self.macOS = macOS
         self.chip = chip
         self.channel = channel
+        self.commit = commit
+        self.buildDate = buildDate
+    }
+}
+
+/// Values stamped into Info.plist by scripts/build-app.sh (TCBuildDate, TCGitCommit).
+public enum BuildStamp {
+    /// Parses the ISO 8601 UTC build date. Unstamped placeholders give nil.
+    public static func date(_ raw: String?) -> Date? {
+        guard let raw, !raw.hasPrefix("$(") else { return nil }
+        return ISO8601DateFormatter().date(from: raw)
+    }
+
+    /// The short SHA, or nil when the build wasn't stamped.
+    public static func commit(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty, !raw.hasPrefix("$("), raw != "unknown" else { return nil }
+        return raw
+    }
+
+    /// Link to the commit on GitHub. Nil for dirty builds, whose code isn't that commit.
+    public static func commitURL(repository: URL, commit: String) -> URL? {
+        guard !commit.hasSuffix("-dirty"),
+              commit.allSatisfy({ $0.isHexDigit }), (7...40).contains(commit.count) else { return nil }
+        return repository.appendingPathComponent("commit").appendingPathComponent(commit)
+    }
+
+    /// Release notes for this version: the GitHub release tagged v<version>.
+    public static func releaseNotesURL(repository: URL, version: String) -> URL {
+        repository.appendingPathComponent("releases/tag/v\(version)")
     }
 }
 
@@ -94,6 +129,8 @@ public enum Feedback {
     public static func diagnosticsText(_ info: DiagnosticInfo, lastError: String?) -> String {
         var lines = [
             "Tinycap \(info.appVersion) (\(info.build))",
+            "Commit: \(info.commit ?? "unknown")",
+            "Built: \(info.buildDate.map { ISO8601DateFormatter().string(from: $0) } ?? "unknown")",
             "Channel: \(info.channel == .appStore ? "App Store" : "Direct")",
             "macOS \(info.macOS)",
             "Chip: \(info.chip)",

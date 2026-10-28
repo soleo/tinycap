@@ -21,6 +21,7 @@ final class RecordingCoordinator {
     private let recorder = ScreenRecorder()
     private let onNeedsPermission: () -> Void
     private var border: RecordingBorderWindow?
+    private var countdown: CountdownController?
     private var previews: [PreviewWindowController] = []
 
     init(onNeedsPermission: @escaping () -> Void) {
@@ -50,7 +51,11 @@ final class RecordingCoordinator {
                 }
                 let settings = RecordingSettings(defaults: .standard)
                 if settings.countdown, let rect = selection.countdownRect {
-                    guard await CountdownController().run(over: rect) else {
+                    let countdown = CountdownController()
+                    self.countdown = countdown
+                    let completed = await countdown.run(over: rect)
+                    self.countdown = nil
+                    guard completed else {
                         state = .idle
                         return
                     }

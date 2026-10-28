@@ -65,12 +65,51 @@ final class FeedbackTests: XCTestCase {
     func testDiagnosticsText() {
         XCTAssertEqual(Feedback.diagnosticsText(info, lastError: nil), """
             Tinycap 0.2.0 (7)
+            Commit: unknown
+            Built: unknown
             Channel: Direct
             macOS 15.1
             Chip: M2 Pro
             Last error: none
             """)
         XCTAssertTrue(Feedback.diagnosticsText(info, lastError: "Disk full").hasSuffix("Last error: Disk full"))
+    }
+}
+
+final class BuildStampTests: XCTestCase {
+    private let repo = URL(string: "https://github.com/soleo/tinycap")!
+
+    func testDateParsesISO8601AndIgnoresPlaceholder() {
+        XCTAssertEqual(BuildStamp.date("2026-10-28T17:30:00Z"), Date(timeIntervalSince1970: 1_793_208_600))
+        XCTAssertNil(BuildStamp.date("$(BUILD_DATE)"))
+        XCTAssertNil(BuildStamp.date(nil))
+    }
+
+    func testCommitIgnoresPlaceholders() {
+        XCTAssertEqual(BuildStamp.commit("7a4e883"), "7a4e883")
+        XCTAssertNil(BuildStamp.commit("$(GIT_COMMIT)"))
+        XCTAssertNil(BuildStamp.commit("unknown"))
+        XCTAssertNil(BuildStamp.commit(""))
+    }
+
+    func testCommitURL() {
+        XCTAssertEqual(BuildStamp.commitURL(repository: repo, commit: "7a4e883")?.absoluteString,
+                       "https://github.com/soleo/tinycap/commit/7a4e883")
+        XCTAssertNil(BuildStamp.commitURL(repository: repo, commit: "7a4e883-dirty"))
+        XCTAssertNil(BuildStamp.commitURL(repository: repo, commit: "main"))
+    }
+
+    func testReleaseNotesURL() {
+        XCTAssertEqual(BuildStamp.releaseNotesURL(repository: repo, version: "0.1.0").absoluteString,
+                       "https://github.com/soleo/tinycap/releases/tag/v0.1.0")
+    }
+
+    func testDiagnosticsIncludeCommitAndDate() {
+        let info = DiagnosticInfo(appVersion: "0.2.0", build: "7", macOS: "15.1", chip: "M2", channel: .direct,
+                                  commit: "7a4e883", buildDate: Date(timeIntervalSince1970: 1_793_208_600))
+        let text = Feedback.diagnosticsText(info, lastError: nil)
+        XCTAssertTrue(text.contains("Commit: 7a4e883"))
+        XCTAssertTrue(text.contains("Built: 2026-10-28T17:30:00Z"))
     }
 }
 

@@ -14,6 +14,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${CONFIG:-release}"
 VERSION="${VERSION:-0.1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
+# Shown in Settings → About. A "-dirty" suffix marks builds with uncommitted changes.
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+GIT_COMMIT="$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [[ "$GIT_COMMIT" != unknown ]] && [[ -n "$(git -C "$(dirname "$0")/.." status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+  GIT_COMMIT="$GIT_COMMIT-dirty"
+fi
 BUNDLE_ID="${BUNDLE_ID:-app.tinycap.Tinycap}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 OUT="$ROOT/build"
@@ -71,6 +77,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 xcrun lipo -create "${binaries[@]}" -output "$APP/Contents/MacOS/Tinycap"
 sed -e "s/\$(BUNDLE_ID)/$BUNDLE_ID/" -e "s/\$(VERSION)/$VERSION/" -e "s/\$(BUILD_NUMBER)/$BUILD_NUMBER/" \
+  -e "s/\$(BUILD_DATE)/$BUILD_DATE/" -e "s/\$(GIT_COMMIT)/$GIT_COMMIT/" \
   "$ROOT/Resources/Info.plist" > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 cp "$ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"

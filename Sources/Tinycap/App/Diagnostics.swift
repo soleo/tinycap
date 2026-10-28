@@ -6,8 +6,21 @@ import TinycapCore
 @MainActor
 enum Diagnostics {
     /// From `TinycapRepositoryURL` in Info.plist, so forks point at their own issues.
-    static var repositoryURL: URL? {
-        (Bundle.main.object(forInfoDictionaryKey: "TinycapRepositoryURL") as? String).flatMap(URL.init(string:))
+    static var repositoryURL: URL? { plistURL("TinycapRepositoryURL") }
+    static var authorURL: URL? { plistURL("TinycapAuthorURL") }
+    static var authorGitHubURL: URL? { plistURL("TinycapAuthorGitHubURL") }
+
+    private static func plistURL(_ key: String) -> URL? {
+        (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap(URL.init(string:))
+    }
+
+    static var commitURL: URL? {
+        guard let repo = repositoryURL, let commit = current.commit else { return nil }
+        return BuildStamp.commitURL(repository: repo, commit: commit)
+    }
+
+    static var releaseNotesURL: URL? {
+        repositoryURL.map { BuildStamp.releaseNotesURL(repository: $0, version: current.appVersion) }
     }
 
     static var current: DiagnosticInfo {
@@ -18,7 +31,9 @@ enum Diagnostics {
             build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
             macOS: Feedback.macOSVersion(major: os.majorVersion, minor: os.minorVersion, patch: os.patchVersion),
             chip: Feedback.chipName(fromBrand: cpuBrand()),
-            channel: channel
+            channel: channel,
+            commit: BuildStamp.commit(bundle.object(forInfoDictionaryKey: "TCGitCommit") as? String),
+            buildDate: BuildStamp.date(bundle.object(forInfoDictionaryKey: "TCBuildDate") as? String)
         )
     }
 

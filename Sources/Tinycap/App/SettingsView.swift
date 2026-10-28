@@ -151,28 +151,56 @@ private struct AboutSettingsView: View {
 
     var body: some View {
         Form {
-            LabeledContent("Version", value: "\(info.appVersion) (\(info.build))")
-            LabeledContent("Installed from", value: info.channel == .appStore ? "App Store" : "Direct download")
+            HStack(spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tinycap").font(.title2.weight(.semibold))
+                    Text("Version \(info.appVersion) (\(info.build))")
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(.vertical, 4)
 
             Section {
-                LabeledContent("Found a problem?") {
+                if let date = info.buildDate {
+                    LabeledContent("Built", value: date.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let commit = info.commit {
+                    LabeledContent("Commit") {
+                        if let url = Diagnostics.commitURL {
+                            Link(commit, destination: url).font(.body.monospaced())
+                        } else {
+                            Text(commit).font(.body.monospaced()).textSelection(.enabled)
+                        }
+                    }
+                }
+                LabeledContent("Installed from", value: info.channel == .appStore ? "App Store" : "Direct download")
+            }
+
+            Section("Links") {
+                links
+            }
+
+            Section {
+                HStack {
                     Button("Report a Bug…") { Diagnostics.open(.bug) }
-                }
-                LabeledContent("Have an idea?") {
                     Button("Send Feedback…") { Diagnostics.open(.feature) }
-                }
-                LabeledContent("Version and last error, for pasting into an issue") {
+                    Spacer()
                     Button(copied ? "Copied" : "Copy Diagnostics") {
                         Diagnostics.copyToPasteboard()
                         copied = true
                     }
                 }
+                .disabled(Diagnostics.repositoryURL == nil)
             } footer: {
-                Text("These open GitHub in your browser, with your Tinycap and macOS versions filled in. Tinycap sends nothing itself; you review and submit the issue.")
+                Text("Report and feedback open GitHub in your browser with your Tinycap and macOS versions filled in. Tinycap sends nothing itself. Copy Diagnostics adds the last error, for pasting into an issue.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .disabled(Diagnostics.repositoryURL == nil)
 
             Section {
                 LabeledContent("Tinycap is open source under the MIT license.") {
@@ -181,6 +209,22 @@ private struct AboutSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder private var links: some View {
+        let items: [(String, URL?)] = [
+            ("Xinjiang Shao", Diagnostics.authorURL),
+            ("@soleo on GitHub", Diagnostics.authorGitHubURL),
+            ("Source code", Diagnostics.repositoryURL),
+            ("Release notes", Diagnostics.releaseNotesURL),
+        ]
+        ForEach(items.compactMap { title, url in url.map { (title, $0) } }, id: \.0) { title, url in
+            LabeledContent(title) {
+                Link(url.host().map { $0 + url.path() } ?? url.absoluteString, destination: url)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
     }
 }
 
