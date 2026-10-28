@@ -31,6 +31,7 @@ final class RecordingCoordinator {
     private var border: RecordingBorderWindow?
     private var countdown: CountdownController?
     private var clicks: ClickHighlighter?
+    private var windowTracker: Timer?
     private var previews: [PreviewWindowController] = []
 
     init(onNeedsPermission: @escaping () -> Void) {
@@ -124,6 +125,16 @@ final class RecordingCoordinator {
     ) async throws {
         let master = try Self.newMasterURL()
 
+        // A window on its own can't show Tinycap's click rings, so with click highlighting
+        // on, record the window's region of its display instead and follow it (RC-4, RC-6).
+        var target = target
+        if settings.highlightsClicks, case .window(let window) = target,
+           let index = Geometry.bestDisplayIndex(for: window.frame, displays: content.displays.map(\.frame)) {
+            let display = content.displays[index]
+            target = .windowRegion(window, on: display,
+                                   rect: Geometry.windowSourceRect(window: window.frame, display: display.frame))
+        }
+
         var ownWindows: [SCWindow] = []
         if settings.highlightsClicks, let window = await startClickHighlighter(for: target) {
             ownWindows.append(window)
@@ -158,6 +169,9 @@ final class RecordingCoordinator {
             border.orderFrontRegardless()
             self.border = border
         }
+        if case .windowRegion(let window, let display, _) = target {
+            trackWindow(window.windowID, on: display.frame)
+        }
         state = .recording(startedAt: Date())
     }
 
@@ -166,7 +180,7 @@ final class RecordingCoordinator {
     private func startClickHighlighter(for target: CaptureTarget) async -> SCWindow? {
         let display: SCDisplay
         switch target {
-        case .display(let d), .area(let d, _): display = d
+        case .display(let d), .area(let d, _), .windowRegion(_, let d, _): display = d
         case .window: return nil
         }
         guard let screen = NSScreen.screens.first(where: { $0.displayID == display.displayID }) else { return nil }
@@ -187,6 +201,33 @@ final class RecordingCoordinator {
         log.error("click overlay window \(highlighter.windowID, privacy: .public) not found in shareable content")
         stopClickHighlighter()
         return nil
+    }
+
+    /// Follows a window-region recording's window ten times a second: moves the capture
+    /// region when the window moves, and stops the recording when the window closes,
+    /// as a single-window capture would.
+    private func trackWindow(_ windowID: CGWindowID, on displayFrame: CGRect) {
+        windowTracker?.invalidate()
+        windowTracker = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], windowID) as? [[CFString: Any]])?.first,
+                      let boundsDict = info[kCGWindowBounds] as? NSDictionary,
+                      let bounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary)
+                else {
+                    log.notice("recorded window \(windowID, privacy: .public) closed; stopping")
+                    self.stop()
+                    return
+                }
+                let rect = Geometry.windowSourceRect(window: bounds, display: displayFrame)
+                Task { await self.recorder.moveSource(to: rect) }
+            }
+        }
+    }
+
+    private func stopWindowTracker() {
+        windowTracker?.invalidate()
+        windowTracker = nil
     }
 
     private func stopClickHighlighter() {
@@ -213,6 +254,7 @@ final class RecordingCoordinator {
         border?.orderOut(nil)
         border = nil
         stopClickHighlighter()
+        stopWindowTracker()
 
         Task {
             do {
