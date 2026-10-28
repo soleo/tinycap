@@ -135,5 +135,7 @@ if [[ "$UNSIGNED" == "0" ]]; then
   echo "Publish (the appcast must be on the latest release for the in-app updater):"
   notes="$ROOT/ReleaseNotes/$VERSION.md"
   if [[ -s "$notes" ]]; then notes_flag="--notes-file '$notes'"; else notes_flag="--generate-notes"; fi
-  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --title 'Tinycap $VERSION' $notes_flag"
+  # Tag the commit the DMG was built from, not whatever the default branch points to later.
+  target="$(git -C "$ROOT" rev-parse HEAD)"
+  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --target $target --title 'Tinycap $VERSION' $notes_flag"
 fi
