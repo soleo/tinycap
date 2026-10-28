@@ -78,6 +78,8 @@ private struct GeneralSettingsView: View {
                 }
             }
 
+            UpdateSettingsSection()
+
             Section {
                 ForEach(ShortcutAction.allCases, id: \.self) { action in
                     LabeledContent(action.title) {
@@ -116,6 +118,55 @@ private struct GeneralSettingsView: View {
             launchAtLogin = SMAppService.mainApp.status == .enabled
             NSAlert(error: error).runModal()
         }
+    }
+}
+
+/// UP-5: "Check for updates daily" (on by default), Check Now and the last-checked time.
+struct UpdateSettingsSection: View {
+    @State private var updates = UpdateController.shared
+
+    var body: some View {
+        if updates.isAvailable { controls } else {
+            Section("Updates") {
+                Text("This build of Tinycap can't check for updates.").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        Section {
+            Toggle("Check for updates daily", isOn: Binding(
+                get: { updates.checksEnabled },
+                set: { updates.checksEnabled = $0 }
+            ))
+            LabeledContent("Last checked") {
+                HStack {
+                    Text(Self.lastCheckText(updates)).foregroundStyle(.secondary)
+                    Button(updates.isChecking ? "Checking…" : "Check Now") { updates.checkNow() }
+                        .disabled(updates.isChecking)
+                }
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text(footer)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var footer: String {
+        #if SPARKLE
+        "The only network request Tinycap makes. It fetches the release list from GitHub; nothing about you or this Mac is sent."
+        #else
+        "The only network request Tinycap makes. It asks the App Store for the latest version number; nothing about you or this Mac is sent."
+        #endif
+    }
+
+    static func lastCheckText(_ updates: UpdateController) -> String {
+        guard let date = updates.lastCheck else { return "Never" }
+        let when = date.formatted(.relative(presentation: .named))
+        return updates.lastCheckFailed ? "\(when) (failed)" : when
     }
 }
 
@@ -179,6 +230,14 @@ private struct AboutSettingsView: View {
                     }
                 }
                 LabeledContent("Installed from", value: info.channel == .appStore ? "App Store" : "Direct download")
+                if UpdateController.shared.isAvailable { LabeledContent("Last update check") {
+                    HStack {
+                        Text(UpdateSettingsSection.lastCheckText(UpdateController.shared))
+                            .foregroundStyle(.secondary)
+                        Button("Check for Updates") { UpdateController.shared.checkNow() }
+                            .disabled(UpdateController.shared.isChecking)
+                    }
+                } }
             }
 
             Section("Links") {

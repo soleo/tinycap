@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openSettings: { [weak self] in self?.settingsWindow.show() }
         )
         registerHotKeys()
+        startUpdates()
 
         if !Permissions.hasScreenRecordingAccess {
             onboarding.show()
@@ -38,6 +39,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         SaveLocation.shared.stopAccessing()
+    }
+
+    private func startUpdates() {
+        let updates = UpdateController.shared
+        updates.isBusy = { [weak self] in self?.coordinator.isBusy ?? false }
+        #if SPARKLE
+        updates.start(with: SparkleUpdateChecker())
+        #elseif APP_STORE
+        updates.start(with: AppStoreUpdateChecker())
+        #endif
+        // Otherwise (a direct build without a Sparkle key) there is no updater.
     }
 
     private func registerHotKeys() {
