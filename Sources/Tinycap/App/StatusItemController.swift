@@ -18,6 +18,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         coordinator.onStateChange = { [weak self] state in self?.apply(state) }
+        UpdateController.shared.onChange = { [weak self] in
+            guard let self else { return }
+            self.apply(self.coordinator.state)
+        }
         apply(coordinator.state)
     }
 
@@ -32,11 +36,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         case .idle, .selecting:
             statusItem.menu = menu
             button.action = nil
-            button.image = MenuBarIcon.idle
+            let update = UpdateController.shared.available
+            button.image = update == nil ? MenuBarIcon.idle : MenuBarIcon.idleWithUpdate
             button.imagePosition = .imageOnly
             button.title = ""
-            button.toolTip = "Tinycap"
-            button.setAccessibilityLabel("Tinycap")
+            button.toolTip = update.map { "Tinycap — version \($0.version) is available" } ?? "Tinycap"
+            button.setAccessibilityLabel(update == nil ? "Tinycap" : "Tinycap, update available")
 
         case .recording(let startedAt):
             statusItem.menu = nil
@@ -85,6 +90,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let busy = coordinator.state != .idle
+
+        if let update = UpdateController.shared.available {
+            let item = NSMenuItem(title: "Update to Tinycap \(update.version)…", action: #selector(showUpdate), keyEquivalent: "")
+            item.target = self
+            item.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
 
         for (action, mode) in [(ShortcutAction.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
             let combo = ShortcutManager.shared.combo(for: action)
@@ -168,6 +181,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func clearRecents() {
         RecentRecordings.clear()
+    }
+
+    @objc private func showUpdate() {
+        UpdateController.shared.showUpdate()
     }
 
     @objc private func reportBug() {

@@ -74,16 +74,19 @@ Other variables: `BUNDLE_ID` (default `app.tinycap.Tinycap`), `VERSION`, `BUILD_
 
 ### Release DMG
 
-`scripts/make-dmg.sh` builds the direct-download DMG. It does four things:
+`scripts/make-dmg.sh` builds the direct-download DMG. It does five things:
 
 - builds the universal app, signed with Developer ID and the hardened runtime
 - packages it with an Applications shortcut, then signs, notarizes and staples the DMG
 - checks the DMG with Gatekeeper
 - prints its SHA-256 for the Homebrew cask
+- writes `appcast.xml` for the in-app updater, signed with the Sparkle EdDSA key
 
 ```sh
 # once: store notarization credentials in the login keychain
 xcrun notarytool store-credentials tinycap-notary --apple-id you@example.com --team-id TEAMID
+# once: create the update-signing key in the keychain; commit Resources/sparkle-public-key.txt
+scripts/make-appcast.sh --setup-key
 
 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=tinycap-notary \
   scripts/make-dmg.sh                 # → build/release/Tinycap-<version>.dmg (+ .sha256)
@@ -91,7 +94,13 @@ SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=tiny
 scripts/make-dmg.sh --unsigned        # local test DMG, not notarized
 ```
 
-The version comes from the latest `v*` git tag (or `VERSION=1.2.3`). The build number is the commit count. Release builds require `nasm`, so the Intel slice gets SIMD.
+Write the user-facing notes in `ReleaseNotes/<version>.md` first. They are converted to HTML and embedded in the appcast, so the update window shows them, and the printed `gh release create` command uses the same file. Attach `appcast.xml` to every release: the app reads it from `releases/latest/download/appcast.xml`. The private signing key stays in the login keychain; back it up to 1Password, because without it existing installs can't verify future updates.
+
+### Updates
+
+The direct build embeds [Sparkle](https://sparkle-project.org) 2.10.0 (`scripts/fetch-sparkle.sh`, pinned by SHA-256) and checks the appcast once a day. The App Store build (`CHANNEL=appstore scripts/build-app.sh`) has no Sparkle; it asks Apple's lookup API for the store version once a day and sends people to the App Store page. Both show a dot on the menu-bar icon, an "Update to Tinycap X.Y…" menu item and one quiet notification per version, and nothing appears while you select, record or export. A direct build made without `Resources/sparkle-public-key.txt` has no updater.
+
+The version comes from the `VERSION` file (or `VERSION=1.2.3`); bump it before tagging a release. The build number is the commit count, for local builds too. Release builds require `nasm`, so the Intel slice gets SIMD.
 
 Two known, harmless messages appear during the release build:
 
@@ -126,7 +135,7 @@ The script removes the light backdrop around the tile, centers it on Apple's 824
 
 ## Privacy
 
-Tinycap makes no network connections. The app is sandboxed with no network, microphone or camera entitlements. Recordings are saved to `~/Movies/Tinycap` until you choose another folder in Settings. The only file entitlements are the Movies folder and folders you pick.
+Tinycap's only network request is the daily update check, which you can turn off in Settings → General. The direct build fetches the appcast from GitHub; the App Store build asks Apple's public lookup API for the latest version by bundle ID. No telemetry, analytics or system profile is sent. The app is sandboxed with a network client entitlement for that check and no microphone or camera entitlements. Recordings are saved to `~/Movies/Tinycap` until you choose another folder in Settings. The only file entitlements are the Movies folder and folders you pick.
 
 ## License
 

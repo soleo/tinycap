@@ -21,6 +21,11 @@ final class RecordingCoordinator {
 
     var onStateChange: ((State) -> Void)?
 
+    /// Selecting, counting down, recording, saving or exporting: no update reminders now (UP-3).
+    var isBusy: Bool {
+        state != .idle || countdown != nil || previews.contains { $0.model.isExporting }
+    }
+
     private let recorder = ScreenRecorder()
     private let onNeedsPermission: () -> Void
     private var border: RecordingBorderWindow?
