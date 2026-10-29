@@ -145,4 +145,6 @@ if [[ "$UNSIGNED" == "0" ]]; then
   # Tag the commit the DMG was built from, not whatever the default branch points to later.
   target="$(git -C "$ROOT" rev-parse HEAD)"
   echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$UPDATE' '$OUT/appcast.xml' --target $target --title 'Tinycap $VERSION' $notes_flag"
+  echo "Then update the Homebrew cask:"
+  echo "  scripts/bump-cask.sh <path to soleo/homebrew-tap> $VERSION"
 fi
