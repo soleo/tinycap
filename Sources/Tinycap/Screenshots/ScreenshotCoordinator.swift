@@ -12,6 +12,7 @@ final class ScreenshotCoordinator {
     var onNeedsPermission: () -> Void = {}
 
     private var editors: [ScreenshotEditorWindowController] = []
+    private var thumbnail: ScreenshotThumbnailController?
 
     var hasEditorOpen: Bool { !editors.isEmpty }
 
@@ -45,13 +46,19 @@ final class ScreenshotCoordinator {
     }
 
     private func deliver(_ shot: Screenshot, settings: ScreenshotSettings) {
+        // A new capture settles the previous thumbnail: it's saved, as on macOS.
+        thumbnail?.saveNow()
         switch settings.afterCapture {
-        case .openEditor:
-            let editor = ScreenshotEditorWindowController(shot) { [weak self] closed in
-                self?.editors.removeAll { $0 === closed }
+        case .thumbnail:
+            let controller = ScreenshotThumbnailController(shot) { [weak self] finished, outcome in
+                guard let self else { return }
+                if self.thumbnail === finished { self.thumbnail = nil }
+                if outcome == .edit { self.openEditor(finished.screenshot) }
             }
-            editors.append(editor)
-            editor.show()
+            thumbnail = controller
+            controller.show()
+        case .openEditor:
+            openEditor(shot)
         case .copy:
             let model = ScreenshotEditorModel(shot)
             if model.copyToPasteboard() { NSSound(named: "Tink")?.play() }
@@ -68,5 +75,13 @@ final class ScreenshotCoordinator {
                 alert.runModal()
             }
         }
+    }
+
+    private func openEditor(_ shot: Screenshot) {
+        let editor = ScreenshotEditorWindowController(shot) { [weak self] closed in
+            self?.editors.removeAll { $0 === closed }
+        }
+        editors.append(editor)
+        editor.show()
     }
 }
