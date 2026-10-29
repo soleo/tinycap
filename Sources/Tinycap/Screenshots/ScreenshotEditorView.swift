@@ -48,19 +48,26 @@ private struct EditorToolbar: View {
     @Bindable var model: ScreenshotEditorModel
     @Binding var zoom: Double?
 
-    /// Which style controls to show: the selected mark's kind, else the current tool's.
-    private var showsTextControls: Bool {
-        if case .text? = model.selected?.kind { return true }
-        if case .arrow? = model.selected?.kind { return false }
-        return model.tool == .text
+    private enum SizeControl { case thickness, text, badge }
+
+    /// Which size control to show: the selected mark's kind, else the current tool's.
+    private var sizeControl: SizeControl {
+        switch model.selected?.kind {
+        case .text?: return .text
+        case .badge?: return .badge
+        case .arrow?, .shape?, .stroke?: return .thickness
+        default: return model.tool == .text ? .text : model.tool == .badge ? .badge : .thickness
+        }
     }
 
     var body: some View {
         let _ = model.revision // refresh undo/redo state
         HStack(spacing: 12) {
             Picker("Tool", selection: $model.tool) {
+                // Icons only: ten tools with titles would crowd out the style controls.
                 ForEach(ScreenshotEditorModel.Tool.allCases) { tool in
-                    Label(tool.title, systemImage: tool.symbol)
+                    Image(systemName: tool.symbol)
+                        .accessibilityLabel(tool.title)
                         .help("\(tool.title) (\(String(tool.key).uppercased()))")
                         .tag(tool)
                 }
@@ -107,10 +114,10 @@ private struct EditorToolbar: View {
         .padding(.vertical, 8)
     }
 
-    /// An arrow or text label is selected, so its style controls apply.
+    /// A mark with a color is selected, so its style controls apply.
     private var selectionIsMark: Bool {
         switch model.selected?.kind {
-        case .arrow?, .text?: return true
+        case .arrow?, .text?, .shape?, .stroke?, .badge?: return true
         default: return false
         }
     }
@@ -130,7 +137,7 @@ private struct EditorToolbar: View {
 
         Divider().frame(height: 20)
 
-        if showsTextControls {
+        if sizeControl != .thickness {
             Picker("Size", selection: Binding(get: { model.style.fontSize }, set: { size in model.applyStyle { $0.fontSize = size } })) {
                 ForEach(sizeOptions(AnnotationStyle.fontSizes, current: model.style.fontSize), id: \.self) { size in
                     Text(size == AnnotationStyle.fontSizes[0] ? "Small" : size == AnnotationStyle.fontSizes[1] ? "Medium"
@@ -138,9 +145,11 @@ private struct EditorToolbar: View {
                 }
             }
             .fixedSize()
-            Toggle("Background", isOn: Binding(get: { model.style.textBackground },
-                                               set: { on in model.applyStyle { $0.textBackground = on } }))
-                .help("Solid background behind the text")
+            if sizeControl == .text {
+                Toggle("Background", isOn: Binding(get: { model.style.textBackground },
+                                                   set: { on in model.applyStyle { $0.textBackground = on } }))
+                    .help("Solid background behind the text")
+            }
         } else {
             Picker("Thickness", selection: Binding(get: { model.style.lineWidth }, set: { width in model.applyStyle { $0.lineWidth = width } })) {
                 ForEach(sizeOptions(AnnotationStyle.lineWidths, current: model.style.lineWidth), id: \.self) { width in
@@ -211,6 +220,12 @@ private struct EditorCanvas: View {
         case drawingRect(id: UUID, start: CGPoint, crop: Bool)
         case rectCorner(id: UUID, corner: Int, original: CGRect, crop: Bool)
         case movingCrop(start: CGPoint, original: CGRect)
+        /// AN-6: a new rectangle or ellipse being dragged out.
+        case drawingShape(id: UUID, start: CGPoint, form: ShapeMark.Form)
+        /// AN-9 and AN-6: a pen or highlighter stroke in progress.
+        case drawingStroke(id: UUID, points: [CGPoint], highlighter: Bool)
+        /// AN-8: a click that drops the next numbered badge.
+        case placingBadge(at: CGPoint)
     }
 
     var body: some View {
@@ -314,6 +329,18 @@ private struct EditorCanvas: View {
             }
         case .arrow:
             drag = .drawing(id: UUID(), start: p)
+        case .rectangle, .ellipse:
+            drag = .drawingShape(id: UUID(), start: p, form: model.tool == .rectangle ? .rectangle : .ellipse)
+        case .pen, .highlighter:
+            drag = .drawingStroke(id: UUID(), points: [p], highlighter: model.tool == .highlighter)
+        case .badge:
+            if let hit, case .badge = hit.kind {
+                model.selectedID = hit.id
+                model.adoptStyle(of: hit)
+                drag = .moving(id: hit.id, start: p, original: hit, moved: false)
+            } else {
+                drag = .placingBadge(at: p)
+            }
         case .text:
             if let hit, case .text = hit.kind {
                 model.selectedID = hit.id
@@ -346,12 +373,13 @@ private struct EditorCanvas: View {
         }
     }
 
-    /// The annotations with `rect` set as the redaction `id` or as the crop.
+    /// The annotations with `rect` set on the redaction, shape or crop `id`, or as a new
+    /// redaction or crop.
     private func withRect(_ rect: CGRect, id: UUID, crop: Bool) -> [Annotation] {
         let item = Annotation(id: id, crop ? .crop(rect) : .redaction(rect))
         var list = model.annotations
         if let index = list.firstIndex(where: { $0.id == id }) {
-            list[index] = item
+            list[index] = list[index].withRect(rect)
         } else if crop {
             list.insert(item, at: 0)
         } else {
@@ -398,9 +426,30 @@ private struct EditorCanvas: View {
             let moved = original.offsetBy(dx: p.x - start.x, dy: p.y - start.y)
             let kept = Geometry.keep(moved, inside: CGRect(origin: .zero, size: model.imageSize))
             model.draft = withRect(kept, id: model.cropAnnotation?.id ?? UUID(), crop: true)
-        case .idle, .ignored, .placingText:
+        case .drawingShape(let id, let start, let form):
+            let rect = shiftDown ? ShapeGeometry.square(from: start, to: p) : Geometry.rect(from: start, to: p)
+            let shape = Annotation(id: id, .shape(ShapeMark(form: form, rect: rect, color: model.style.color, lineWidth: model.style.lineWidth)))
+            model.draft = model.annotations + [shape]
+        case .drawingStroke(let id, let points, let highlighter):
+            // Shift draws a highlighter straight, for underlining a line of text.
+            let next = highlighter && shiftDown ? [points[0], p] : StrokeGeometry.appending(p, to: points, spacing: max(1, tolerance / 4))
+            drag = .drawingStroke(id: id, points: next, highlighter: highlighter)
+            model.draft = model.annotations + [stroke(id: id, points: next, highlighter: highlighter)]
+        case .idle, .ignored, .placingText, .placingBadge:
             break
         }
+    }
+
+    private func stroke(id: UUID, points: [CGPoint], highlighter: Bool) -> Annotation {
+        Annotation(id: id, .stroke(Stroke(points: points, color: model.style.color, lineWidth: model.style.lineWidth, isHighlighter: highlighter)))
+    }
+
+    /// A click (no real drag) with a drawing tool selects whatever is under it.
+    private func selectHit(at p: CGPoint) {
+        model.draft = nil
+        let hit = AnnotationHitTest.hit(p, in: model.annotations, tolerance: tolerance)
+        model.selectedID = hit?.id
+        if let hit { model.adoptStyle(of: hit) }
     }
 
     private func finish(at p: CGPoint) {
@@ -408,14 +457,30 @@ private struct EditorCanvas: View {
         case .drawing(let id, _):
             guard let arrow = model.draft?.first(where: { $0.id == id }), case .arrow(let a) = arrow.kind,
                   hypot(a.end.x - a.start.x, a.end.y - a.start.y) >= tolerance * 1.5 else {
-                // A click with the arrow tool selects whatever is under it.
-                model.draft = nil
-                let hit = AnnotationHitTest.hit(p, in: model.annotations, tolerance: tolerance)
-                model.selectedID = hit?.id
-                if let hit { model.adoptStyle(of: hit) }
+                selectHit(at: p)
                 return
             }
             model.add(arrow, name: "Add Arrow")
+        case .drawingShape(let id, _, let form):
+            guard let shape = model.draft?.first(where: { $0.id == id }), let r = shape.rect,
+                  max(r.width, r.height) >= tolerance * 1.5 else {
+                selectHit(at: p)
+                return
+            }
+            model.add(shape, name: form == .rectangle ? "Add Rectangle" : "Add Ellipse")
+        case .drawingStroke(let id, var points, let highlighter):
+            // Keep the release point, which the spacing filter may have skipped.
+            if points.last != p, !(highlighter && shiftDown) { points.append(p) }
+            guard StrokeGeometry.length(points) >= tolerance else {
+                selectHit(at: p)
+                return
+            }
+            model.add(stroke(id: id, points: points, highlighter: highlighter), name: highlighter ? "Highlight" : "Draw")
+        case .placingBadge(let start):
+            guard hypot(p.x - start.x, p.y - start.y) < tolerance * 2 else { return }
+            let badge = Badge(center: p, number: Annotation.nextBadgeNumber(in: model.annotations),
+                              color: model.style.color, fontSize: model.style.fontSize)
+            model.add(Annotation(.badge(badge)), name: "Add Number")
         case .moving(let id, _, _, let moved):
             if moved, let draft = model.draft {
                 model.commit(draft, name: "Move", select: id)
@@ -474,6 +539,8 @@ private struct EditorCanvas: View {
         case .arrow(let a): return [a.start, ArrowGeometry.midpoint(a), a.end]
         case .text: return [CGPoint(x: annotation.bounds.maxX, y: annotation.bounds.maxY)]
         case .redaction(let r), .crop(let r): return RectGeometry.corners(r)
+        case .shape(let s): return RectGeometry.corners(s.rect.standardized)
+        case .stroke, .badge: return []
         }
     }
 
@@ -490,7 +557,11 @@ private struct EditorCanvas: View {
             if let corner = RectGeometry.corners(r).firstIndex(where: near) {
                 return .rectCorner(id: annotation.id, corner: corner, original: r, crop: false)
             }
-        case .crop:
+        case .shape(let s):
+            if let corner = RectGeometry.corners(s.rect.standardized).firstIndex(where: near) {
+                return .rectCorner(id: annotation.id, corner: corner, original: s.rect.standardized, crop: false)
+            }
+        case .crop, .stroke, .badge:
             break
         }
         return nil

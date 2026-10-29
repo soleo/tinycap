@@ -15,6 +15,9 @@ public enum AnnotationRenderer {
             switch annotation.kind {
             case .arrow(let arrow): draw(arrow, in: context)
             case .text(let label): draw(label, in: context)
+            case .shape(let shape): draw(shape, in: context)
+            case .stroke(let stroke): draw(stroke, in: context)
+            case .badge(let badge): draw(badge, in: context)
             case .redaction, .crop: break // drawn by drawRedactions / applied by flatten
             }
         }
@@ -119,6 +122,82 @@ public enum AnnotationRenderer {
         context.strokePath()
 
         context.endTransparencyLayer()
+        context.restoreGState()
+    }
+
+    /// AN-6: a rectangle (slightly rounded corners) or ellipse outline with the arrows' shadow.
+    public static func draw(_ shape: ShapeMark, in context: CGContext) {
+        let r = shape.rect.standardized
+        guard r.width > 0, r.height > 0 else { return }
+        context.saveGState()
+        softShadow(context, size: shape.lineWidth)
+        context.setStrokeColor(shape.color.cgColor)
+        context.setLineWidth(shape.lineWidth)
+        context.setLineJoin(.round)
+        switch shape.form {
+        case .rectangle:
+            let radius = ShapeGeometry.cornerRadius(shape)
+            context.addPath(CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil))
+        case .ellipse:
+            context.addEllipse(in: r)
+        }
+        context.strokePath()
+        context.restoreGState()
+    }
+
+    /// AN-9 pen: an opaque, rounded line with a soft shadow. AN-6 highlighter: a wide,
+    /// see-through line with no shadow, drawn as one layer so its own overlaps don't darken.
+    public static func draw(_ stroke: Stroke, in context: CGContext) {
+        guard !stroke.points.isEmpty else { return }
+        context.saveGState()
+        if stroke.isHighlighter {
+            context.setAlpha(Stroke.highlighterAlpha)
+        } else {
+            softShadow(context, size: stroke.lineWidth)
+        }
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        context.setStrokeColor(stroke.color.cgColor)
+        context.setLineWidth(stroke.drawnWidth)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        if stroke.points.count == 1, let p = stroke.points.first {
+            context.setFillColor(stroke.color.cgColor)
+            context.fillEllipse(in: CGRect(x: p.x - stroke.drawnWidth / 2, y: p.y - stroke.drawnWidth / 2,
+                                           width: stroke.drawnWidth, height: stroke.drawnWidth))
+        } else {
+            context.addPath(StrokeGeometry.path(stroke.points))
+            context.strokePath()
+        }
+        context.endTransparencyLayer()
+        context.restoreGState()
+    }
+
+    /// AN-8: a filled circle (a pill from 10 up) with a thin white ring and the number in
+    /// black or white, whichever reads better on the color.
+    public static func draw(_ badge: Badge, in context: CGContext) {
+        let frame = BadgeLayout.frame(badge)
+        let radius = frame.height / 2
+        let shape = CGPath(roundedRect: frame, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        context.saveGState()
+        context.saveGState()
+        softShadow(context, size: badge.diameter * 0.2)
+        context.setFillColor(badge.color.cgColor)
+        context.addPath(shape)
+        context.fillPath()
+        context.restoreGState()
+        context.setStrokeColor(CGColor(gray: 1, alpha: 0.9))
+        context.setLineWidth(max(1.5, badge.diameter * 0.05))
+        context.addPath(shape)
+        context.strokePath()
+
+        let font = BadgeLayout.font(badge)
+        let line = BadgeLayout.line(badge, color: badge.color.contrasting.cgColor)
+        let width = Double(CTLineGetTypographicBounds(line, nil, nil, nil))
+        // Digits are cap-height tall: center that between the baseline and the cap line.
+        let capHeight = Double(CTFontGetCapHeight(font))
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        context.textPosition = CGPoint(x: frame.midX - width / 2, y: frame.midY + capHeight / 2)
+        CTLineDraw(line, context)
         context.restoreGState()
     }
 

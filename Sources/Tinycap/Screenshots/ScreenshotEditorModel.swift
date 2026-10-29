@@ -8,13 +8,18 @@ import TinycapCore
 @Observable
 final class ScreenshotEditorModel {
     enum Tool: String, CaseIterable, Identifiable {
-        case select, arrow, text, redact, crop
+        case select, arrow, rectangle, ellipse, text, pen, highlighter, badge, redact, crop
         var id: String { rawValue }
         var title: String {
             switch self {
             case .select: return "Select"
             case .arrow: return "Arrow"
+            case .rectangle: return "Rectangle"
+            case .ellipse: return "Ellipse"
             case .text: return "Text"
+            case .pen: return "Pen"
+            case .highlighter: return "Highlighter"
+            case .badge: return "Number"
             case .redact: return "Pixelate"
             case .crop: return "Crop"
             }
@@ -23,17 +28,28 @@ final class ScreenshotEditorModel {
             switch self {
             case .select: return "cursorarrow"
             case .arrow: return "arrow.up.right"
+            case .rectangle: return "rectangle"
+            case .ellipse: return "circle"
             case .text: return "textformat"
+            case .pen: return "pencil.tip"
+            case .highlighter: return "highlighter"
+            case .badge: return "1.circle"
             case .redact: return "checkerboard.rectangle"
             case .crop: return "crop"
             }
         }
-        /// V, A, T, P, C, as in most image editors.
+        /// Single-letter shortcuts, as in most image editors (O for ellipse, D for draw,
+        /// N for number).
         var key: Character {
             switch self {
             case .select: return "v"
             case .arrow: return "a"
+            case .rectangle: return "r"
+            case .ellipse: return "o"
             case .text: return "t"
+            case .pen: return "d"
+            case .highlighter: return "h"
+            case .badge: return "n"
             case .redact: return "p"
             case .crop: return "c"
             }
@@ -89,7 +105,9 @@ final class ScreenshotEditorModel {
     // MARK: - Edits
 
     /// Replaces the annotation list as one undoable step.
-    func commit(_ new: [Annotation], name: String, select: UUID? = nil) {
+    func commit(_ proposed: [Annotation], name: String, select: UUID? = nil) {
+        // Badges are always numbered 1, 2, 3… in order, so a delete closes the gap.
+        let new = Annotation.numberingBadges(proposed)
         let old = annotations
         let oldSelection = selectedID
         draft = nil
@@ -137,6 +155,15 @@ final class ScreenshotEditorModel {
             s.color = t.color
             s.fontSize = t.fontSize
             s.textBackground = t.hasBackground
+        case .shape(let shape):
+            s.color = shape.color
+            s.lineWidth = shape.lineWidth
+        case .stroke(let stroke):
+            s.color = stroke.color
+            s.lineWidth = stroke.lineWidth
+        case .badge(let badge):
+            s.color = badge.color
+            s.fontSize = badge.fontSize
         case .redaction, .crop:
             return
         }

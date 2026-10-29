@@ -83,6 +83,56 @@ public struct TextLabel: Codable, Equatable, Sendable {
     }
 }
 
+/// AN-6: a rectangle or ellipse outline.
+public struct ShapeMark: Codable, Equatable, Sendable {
+    public enum Form: String, Codable, Sendable { case rectangle, ellipse }
+    public var form: Form
+    /// The outline's center line, in image pixels.
+    public var rect: CGRect
+    public var color: RGBAColor
+    public var lineWidth: Double
+
+    public init(form: Form, rect: CGRect, color: RGBAColor, lineWidth: Double) {
+        self.form = form; self.rect = rect; self.color = color; self.lineWidth = lineWidth
+    }
+}
+
+/// AN-9 and AN-6: a freehand pen line, or a wide see-through highlighter stroke.
+public struct Stroke: Codable, Equatable, Sendable {
+    /// The path as drawn, in image pixels.
+    public var points: [CGPoint]
+    public var color: RGBAColor
+    /// The style's thickness. A highlighter is drawn wider (`drawnWidth`).
+    public var lineWidth: Double
+    public var isHighlighter: Bool
+
+    public init(points: [CGPoint], color: RGBAColor, lineWidth: Double, isHighlighter: Bool) {
+        self.points = points; self.color = color; self.lineWidth = lineWidth; self.isHighlighter = isHighlighter
+    }
+
+    /// Thin, Medium and Thick give a 20, 28 or 40 px highlighter: wide enough to cover a line of text.
+    public var drawnWidth: Double { isHighlighter ? lineWidth * 2 + 12 : lineWidth }
+
+    /// How opaque a highlighter is; text under it stays readable.
+    public static let highlighterAlpha = 0.4
+}
+
+/// AN-8: a numbered step badge. Numbers follow the badges' order: 1, 2, 3…
+public struct Badge: Codable, Equatable, Sendable {
+    public var center: CGPoint
+    public var number: Int
+    public var color: RGBAColor
+    /// The style's text size; the badge is a little larger.
+    public var fontSize: Double
+
+    public init(center: CGPoint, number: Int, color: RGBAColor, fontSize: Double) {
+        self.center = center; self.number = number; self.color = color; self.fontSize = fontSize
+    }
+
+    /// Small, Medium and Large give 31, 47 or 73 px circles.
+    public var diameter: Double { (fontSize * 1.3).rounded() }
+}
+
 public struct Annotation: Identifiable, Codable, Equatable, Sendable {
     public enum Kind: Codable, Equatable, Sendable {
         case arrow(Arrow)
@@ -92,13 +142,17 @@ public struct Annotation: Identifiable, Codable, Equatable, Sendable {
         case redaction(CGRect)
         /// AN-8: the part of the image to export. At most one per document.
         case crop(CGRect)
+        case shape(ShapeMark)
+        case stroke(Stroke)
+        case badge(Badge)
     }
 
-    /// The rectangle of a redaction or crop.
+    /// The rectangle of a redaction, crop or shape: what its corner handles move.
     public var rect: CGRect? {
         switch kind {
         case .redaction(let r), .crop(let r): return r
-        case .arrow, .text: return nil
+        case .shape(let s): return s.rect
+        case .arrow, .text, .stroke, .badge: return nil
         }
     }
 
@@ -107,7 +161,10 @@ public struct Annotation: Identifiable, Codable, Equatable, Sendable {
         switch kind {
         case .redaction: copy.kind = .redaction(rect)
         case .crop: copy.kind = .crop(rect)
-        case .arrow, .text: break
+        case .shape(var s):
+            s.rect = rect
+            copy.kind = .shape(s)
+        case .arrow, .text, .stroke, .badge: break
         }
         return copy
     }
@@ -133,6 +190,14 @@ public struct Annotation: Identifiable, Codable, Equatable, Sendable {
             return TextLayout.frame(t)
         case .redaction(let r), .crop(let r):
             return r
+        case .shape(let s):
+            return s.rect.standardized.insetBy(dx: -s.lineWidth / 2, dy: -s.lineWidth / 2)
+        case .stroke(let s):
+            guard let first = s.points.first else { return .null }
+            let rect = s.points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { $0.union(CGRect(origin: $1, size: .zero)) }
+            return rect.insetBy(dx: -s.drawnWidth / 2, dy: -s.drawnWidth / 2)
+        case .badge(let b):
+            return BadgeLayout.frame(b)
         }
     }
 
@@ -148,6 +213,14 @@ public struct Annotation: Identifiable, Codable, Equatable, Sendable {
             copy.kind = .text(t)
         case .redaction(let r), .crop(let r):
             return withRect(r.offsetBy(dx: delta.dx, dy: delta.dy))
+        case .shape(let s):
+            return withRect(s.rect.offsetBy(dx: delta.dx, dy: delta.dy))
+        case .stroke(var s):
+            s.points = s.points.map { CGPoint(x: $0.x + delta.dx, y: $0.y + delta.dy) }
+            copy.kind = .stroke(s)
+        case .badge(var b):
+            b.center.x += delta.dx; b.center.y += delta.dy
+            copy.kind = .badge(b)
         }
         return copy
     }
@@ -165,10 +238,41 @@ public struct Annotation: Identifiable, Codable, Equatable, Sendable {
             t.fontSize = style.fontSize
             t.hasBackground = style.textBackground
             copy.kind = .text(t)
+        case .shape(var s):
+            s.color = style.color
+            s.lineWidth = style.lineWidth
+            copy.kind = .shape(s)
+        case .stroke(var s):
+            s.color = style.color
+            s.lineWidth = style.lineWidth
+            copy.kind = .stroke(s)
+        case .badge(var b):
+            b.color = style.color
+            b.fontSize = style.fontSize
+            copy.kind = .badge(b)
         case .redaction, .crop:
             break
         }
         return copy
+    }
+
+    /// Numbers the badges 1, 2, 3… in list order, so deleting one closes the gap.
+    public static func numberingBadges(_ annotations: [Annotation]) -> [Annotation] {
+        var number = 0
+        return annotations.map { annotation in
+            guard case .badge(var badge) = annotation.kind else { return annotation }
+            number += 1
+            guard badge.number != number else { return annotation }
+            badge.number = number
+            var copy = annotation
+            copy.kind = .badge(badge)
+            return copy
+        }
+    }
+
+    /// The number a new badge gets.
+    public static func nextBadgeNumber(in annotations: [Annotation]) -> Int {
+        annotations.filter { if case .badge = $0.kind { return true } else { return false } }.count + 1
     }
 }
 
@@ -271,6 +375,13 @@ public enum AnnotationHitTest {
                 return annotation.bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
             case .crop:
                 return false // the crop is edited with the Crop tool, not selected like a mark
+            case .shape(let s):
+                // Only the outline, so marks and shapes inside it can still be picked.
+                return ShapeGeometry.distance(from: point, to: s) <= tolerance + s.lineWidth / 2
+            case .stroke(let s):
+                return StrokeGeometry.distance(from: point, to: s.points) <= tolerance + s.drawnWidth / 2
+            case .badge:
+                return annotation.bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
             }
         }
     }
@@ -332,5 +443,97 @@ public enum RectGeometry {
     public static func clamp(_ r: CGRect, toImage size: CGSize) -> CGRect? {
         let clipped = r.standardized.intersection(CGRect(origin: .zero, size: size)).integral
         return clipped.isNull || clipped.width < 1 || clipped.height < 1 ? nil : clipped
+    }
+}
+
+public enum ShapeGeometry {
+    /// With Shift: a square from `start`, as large as the drag's longer side, toward `end`.
+    public static func square(from start: CGPoint, to end: CGPoint) -> CGRect {
+        let dx = end.x - start.x, dy = end.y - start.y
+        let side = max(abs(dx), abs(dy))
+        return Geometry.rect(from: start, to: CGPoint(x: start.x + (dx < 0 ? -side : side), y: start.y + (dy < 0 ? -side : side)))
+    }
+
+    /// Distance from `p` to the outline's center line.
+    public static func distance(from p: CGPoint, to shape: ShapeMark) -> Double {
+        let r = shape.rect.standardized
+        switch shape.form {
+        case .rectangle:
+            let corners = RectGeometry.corners(r)
+            return (0..<4).map { ArrowGeometry.distance(from: p, toSegment: corners[$0], corners[($0 + 1) % 4]) }.min()!
+        case .ellipse:
+            let points = outline(r, count: 72)
+            return zip(points, points.dropFirst() + [points[0]]).map { ArrowGeometry.distance(from: p, toSegment: $0, $1) }.min()!
+        }
+    }
+
+    /// Points around an ellipse inscribed in `rect`.
+    public static func outline(_ rect: CGRect, count: Int) -> [CGPoint] {
+        (0..<count).map { i in
+            let angle = Double(i) / Double(count) * 2 * Double.pi
+            return CGPoint(x: rect.midX + rect.width / 2 * cos(angle), y: rect.midY + rect.height / 2 * sin(angle))
+        }
+    }
+
+    /// Corner radius for a rectangle outline: slightly soft, never more than the shape allows.
+    public static func cornerRadius(_ shape: ShapeMark) -> Double {
+        let r = shape.rect.standardized
+        return max(0, min(shape.lineWidth * 1.5, r.width / 2 - 0.01, r.height / 2 - 0.01))
+    }
+}
+
+public enum StrokeGeometry {
+    /// Adds `p` to a stroke being drawn unless it is within `spacing` of the last point,
+    /// which keeps paths small without visibly changing them.
+    public static func appending(_ p: CGPoint, to points: [CGPoint], spacing: Double) -> [CGPoint] {
+        guard let last = points.last else { return [p] }
+        return hypot(p.x - last.x, p.y - last.y) < spacing ? points : points + [p]
+    }
+
+    /// Total length along the points.
+    public static func length(_ points: [CGPoint]) -> Double {
+        zip(points, points.dropFirst()).reduce(0) { $0 + hypot($1.1.x - $1.0.x, $1.1.y - $1.0.y) }
+    }
+
+    public static func distance(from p: CGPoint, to points: [CGPoint]) -> Double {
+        guard let first = points.first else { return .infinity }
+        guard points.count > 1 else { return hypot(p.x - first.x, p.y - first.y) }
+        return zip(points, points.dropFirst()).map { ArrowGeometry.distance(from: p, toSegment: $0, $1) }.min()!
+    }
+
+    /// A smooth path through the points: straight to the first midpoint, then quadratic
+    /// curves with each point as the control, which rounds off the mouse's jitter.
+    public static func path(_ points: [CGPoint]) -> CGPath {
+        let path = CGMutablePath()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        guard points.count > 2 else {
+            points.dropFirst().forEach { path.addLine(to: $0) }
+            return path
+        }
+        for i in 1..<(points.count - 1) {
+            let mid = CGPoint(x: (points[i].x + points[i + 1].x) / 2, y: (points[i].y + points[i + 1].y) / 2)
+            path.addQuadCurve(to: mid, control: points[i])
+        }
+        path.addLine(to: points[points.count - 1])
+        return path
+    }
+}
+
+public enum BadgeLayout {
+    /// The number's font: bold system digits at a size that fits the circle.
+    public static func font(_ badge: Badge) -> CTFont { TextLayout.font(size: (badge.diameter * 0.55).rounded()) }
+
+    public static func line(_ badge: Badge, color: CGColor? = nil) -> CTLine {
+        var attributes: [NSAttributedString.Key: Any] = [NSAttributedString.Key(kCTFontAttributeName as String): font(badge)]
+        if let color { attributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = color }
+        return CTLineCreateWithAttributedString(NSAttributedString(string: String(badge.number), attributes: attributes))
+    }
+
+    /// A circle, or a pill for numbers too wide for one (10 and up).
+    public static func frame(_ badge: Badge) -> CGRect {
+        let textWidth = Double(CTLineGetTypographicBounds(line(badge), nil, nil, nil))
+        let width = max(badge.diameter, (textWidth + badge.diameter * 0.5).rounded(.up))
+        return CGRect(x: badge.center.x - width / 2, y: badge.center.y - badge.diameter / 2, width: width, height: badge.diameter)
     }
 }

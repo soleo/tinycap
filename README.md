@@ -40,7 +40,8 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 **Screenshots**
 - Same overlays as recording; full Retina resolution; window shots keep transparent corners, shadow optional
 - After capture: a floating thumbnail (click to edit, drag out, saved if left alone), or open the editor, copy, or save
-- Editor: arrows (Shift snaps to 45°, bend from the middle handle), text with an optional background, pixelate, crop; select, move, resize, delete, undo/redo; six colors plus a picker; V / A / T / P / C switch tools
+- Editor: arrows (Shift snaps to 45°, bend from the middle handle), rectangles and ellipses (Shift for a square or circle), text with an optional background, pen, highlighter (Shift draws straight), numbered badges that renumber themselves, pixelate, crop; select, move, resize, delete, undo/redo; six colors plus a picker
+- Tool keys: V select, A arrow, R rectangle, O ellipse, T text, D pen, H highlighter, N number, P pixelate, C crop
 - Export: ⌘C, ⌘S or drag out; PNG or JPEG at 2× or 1× with the pixel and file size shown; no metadata in the file
 
 **Settings**
@@ -50,7 +51,7 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 - Screenshot: after capture, format, scale, window shadow, default annotation style
 - About: version, build date and commit, links, Report a Bug, Send Feedback, Copy Diagnostics, Acknowledgements
 
-Next: screenshot self-timer, shapes, highlighter and numbered badges; the App Store.
+Next: screenshot self-timer; the App Store.
 
 ### How GIFs stay small
 
