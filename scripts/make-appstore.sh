@@ -60,6 +60,21 @@ team="$(plist TeamIdentifier:0)"
   || die "both identities must belong to team $team, the profile's team"
 # ISO 8601, e.g. 2027-10-29T10:00:00Z
 expires="$(/usr/bin/plutil -extract ExpirationDate raw -o - "$profile" 2>/dev/null || true)"
+# The app must be signed with a certificate the profile lists, or App Store Connect
+# rejects the upload (ITMS-90284). Several certificates can share one name, so match by
+# SHA-1 fingerprint and sign with the matching one.
+profile_certs=()
+for i in $(seq 0 20); do
+  der="$(/usr/bin/plutil -extract "DeveloperCertificates.$i" raw -o - "$profile" 2>/dev/null)" || break
+  profile_certs+=("$(printf '%s' "$der" | base64 -D | shasum -a 1 | awk '{print toupper($1)}')")
+done
+(( ${#profile_certs[@]} > 0 )) || die "the profile lists no certificates"
+signing_hash=""
+while read -r hash; do
+  for cert in "${profile_certs[@]}"; do [[ "$hash" == "$cert" ]] && signing_hash="$hash"; done
+done < <(printf '%s\n' "$signing" | awk -v name="\"$SIGN_IDENTITY\"" 'index($0, name) { print toupper($2) }')
+[[ -n "$signing_hash" ]] || die "none of your '$SIGN_IDENTITY' certificates is in the profile (it has ${profile_certs[*]}).
+  Edit the profile on developer.apple.com, select the certificate in your keychain, download it again."
 if [[ -n "$expires" ]] && (( $(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$expires" +%s 2>/dev/null || echo 0) < $(date +%s) )); then
   die "the provisioning profile expired on $expires; download a new one"
 fi
@@ -78,8 +93,9 @@ mkdir -p "$OUT"
 
 # --- 1. App ----------------------------------------------------------------------
 step "Building Tinycap $VERSION ($BUILD_NUMBER) for the App Store, universal release"
+echo "    signing with $SIGN_IDENTITY, certificate $signing_hash (in the profile)"
 CHANNEL=appstore CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUNDLE_ID="$BUNDLE_ID" \
-  SIGN_IDENTITY="$SIGN_IDENTITY" PROVISIONING_PROFILE="$PROVISIONING_PROFILE" \
+  SIGN_IDENTITY="$signing_hash" PROVISIONING_PROFILE="$PROVISIONING_PROFILE" \
   "$ROOT/scripts/build-app.sh"
 
 # --- 2. Checks -------------------------------------------------------------------
@@ -95,6 +111,9 @@ entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 [[ "$entitlements" != *temporary-exception* ]] || die "temporary sandbox exceptions in the App Store build"
 [[ "$entitlements" == *"$team.$BUNDLE_ID"* ]] || die "the signature doesn't carry the application identifier"
 codesign --verify --strict --deep "$APP" || die "app signature doesn't verify"
+quarantined="$(xattr -rl "$APP" 2>/dev/null | grep com.apple.quarantine || true)"
+[[ -z "$quarantined" ]] || die "files in the app carry com.apple.quarantine, which App Store Connect rejects:
+$quarantined"
 
 # --- 3. Package ------------------------------------------------------------------
 step "Creating $(basename "$PKG")"
