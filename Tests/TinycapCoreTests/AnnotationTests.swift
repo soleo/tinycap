@@ -327,3 +327,152 @@ final class CropAndRedactTests: XCTestCase {
         XCTAssertNil(AnnotationHitTest.hit(CGPoint(x: 80, y: 80), in: [crop, redaction], tolerance: 2))
     }
 }
+
+final class ShapeStrokeBadgeTests: XCTestCase {
+    private let pink = RGBAColor.presets[0]
+
+    private func white(width: Int, height: Int) -> CGImage {
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()!
+    }
+
+    private func pixel(_ image: CGImage, x: Int, y: Int) -> [UInt8] {
+        var data = [UInt8](repeating: 0, count: 4)
+        let context = CGContext(data: &data, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
+        return data
+    }
+
+    private func isPink(_ p: [UInt8]) -> Bool { p[0] > 200 && p[1] < 120 }
+    private func isWhite(_ p: [UInt8]) -> Bool { p[0] > 240 && p[1] > 240 && p[2] > 240 }
+
+    // MARK: Shapes
+
+    func testRectangleDrawsOutlineOnly() {
+        let shape = ShapeMark(form: .rectangle, rect: CGRect(x: 20, y: 20, width: 100, height: 60), color: pink, lineWidth: 8)
+        let flat = AnnotationRenderer.flatten(white(width: 160, height: 100), annotations: [Annotation(.shape(shape))])!
+        XCTAssertTrue(isPink(pixel(flat, x: 70, y: 20)), "top edge")
+        XCTAssertTrue(isPink(pixel(flat, x: 20, y: 50)), "left edge")
+        XCTAssertTrue(isWhite(pixel(flat, x: 70, y: 50)), "inside stays clear")
+    }
+
+    func testEllipseDrawsOnItsCurve() {
+        let shape = ShapeMark(form: .ellipse, rect: CGRect(x: 20, y: 20, width: 100, height: 60), color: pink, lineWidth: 8)
+        let flat = AnnotationRenderer.flatten(white(width: 160, height: 100), annotations: [Annotation(.shape(shape))])!
+        XCTAssertTrue(isPink(pixel(flat, x: 70, y: 20)), "top of the ellipse")
+        XCTAssertTrue(isPink(pixel(flat, x: 120, y: 50)), "right of the ellipse")
+        XCTAssertTrue(isWhite(pixel(flat, x: 24, y: 24)), "the rectangle's corner is outside the ellipse")
+        XCTAssertTrue(isWhite(pixel(flat, x: 70, y: 50)), "center stays clear")
+    }
+
+    func testShapeHitsOnTheOutlineNotInside() {
+        let rect = Annotation(.shape(ShapeMark(form: .rectangle, rect: CGRect(x: 0, y: 0, width: 100, height: 100), color: pink, lineWidth: 4)))
+        XCTAssertNotNil(AnnotationHitTest.hit(CGPoint(x: 50, y: 3), in: [rect], tolerance: 2))
+        XCTAssertNil(AnnotationHitTest.hit(CGPoint(x: 50, y: 50), in: [rect], tolerance: 2), "inside lets marks under it be picked")
+
+        let ellipse = Annotation(.shape(ShapeMark(form: .ellipse, rect: CGRect(x: 0, y: 0, width: 100, height: 100), color: pink, lineWidth: 4)))
+        XCTAssertNotNil(AnnotationHitTest.hit(CGPoint(x: 100, y: 50), in: [ellipse], tolerance: 2))
+        XCTAssertNil(AnnotationHitTest.hit(CGPoint(x: 3, y: 3), in: [ellipse], tolerance: 2), "corner of the box is off the curve")
+    }
+
+    func testSquareWithShiftFollowsTheDragDirection() {
+        XCTAssertEqual(ShapeGeometry.square(from: CGPoint(x: 50, y: 50), to: CGPoint(x: 80, y: 60)), CGRect(x: 50, y: 50, width: 30, height: 30))
+        XCTAssertEqual(ShapeGeometry.square(from: CGPoint(x: 50, y: 50), to: CGPoint(x: 40, y: 0)), CGRect(x: 0, y: 0, width: 50, height: 50))
+    }
+
+    func testShapeResizeMoveAndRestyle() {
+        let shape = Annotation(.shape(ShapeMark(form: .ellipse, rect: CGRect(x: 10, y: 10, width: 50, height: 30), color: pink, lineWidth: 4)))
+        XCTAssertEqual(shape.rect, CGRect(x: 10, y: 10, width: 50, height: 30))
+        XCTAssertEqual(shape.withRect(CGRect(x: 0, y: 0, width: 5, height: 5)).rect, CGRect(x: 0, y: 0, width: 5, height: 5))
+        XCTAssertEqual(shape.moved(by: CGVector(dx: 5, dy: -5)).rect, CGRect(x: 15, y: 5, width: 50, height: 30))
+        XCTAssertEqual(shape.bounds, CGRect(x: 8, y: 8, width: 54, height: 34), "bounds include half the line")
+        guard case .shape(let styled) = shape.restyled(AnnotationStyle(color: RGBAColor.presets[3], lineWidth: 14)).kind else { return XCTFail() }
+        XCTAssertEqual(styled.color, RGBAColor.presets[3]); XCTAssertEqual(styled.lineWidth, 14); XCTAssertEqual(styled.form, .ellipse)
+    }
+
+    // MARK: Pen and highlighter
+
+    func testStrokeSpacingDropsTinySteps() {
+        var points: [CGPoint] = []
+        for x in stride(from: 0.0, through: 10, by: 0.5) { points = StrokeGeometry.appending(CGPoint(x: x, y: 0), to: points, spacing: 2) }
+        XCTAssertEqual(points.count, 6) // 0, 2, 4, 6, 8, 10
+        XCTAssertEqual(StrokeGeometry.length(points), 10, accuracy: 0.001)
+    }
+
+    func testPenDrawsOpaqueAlongItsPath() {
+        let stroke = Stroke(points: [CGPoint(x: 10, y: 50), CGPoint(x: 80, y: 40), CGPoint(x: 150, y: 50)], color: pink, lineWidth: 8, isHighlighter: false)
+        let flat = AnnotationRenderer.flatten(white(width: 160, height: 100), annotations: [Annotation(.stroke(stroke))])!
+        XCTAssertTrue(isPink(pixel(flat, x: 150, y: 50)), "ends at the last point")
+        XCTAssertTrue(isPink(pixel(flat, x: 12, y: 50)), "starts at the first point")
+        XCTAssertTrue(isWhite(pixel(flat, x: 80, y: 80)))
+    }
+
+    func testHighlighterIsWideAndSeeThrough() {
+        let yellow = RGBAColor.presets[1]
+        let stroke = Stroke(points: [CGPoint(x: 10, y: 50), CGPoint(x: 150, y: 50)], color: yellow, lineWidth: 8, isHighlighter: true)
+        XCTAssertEqual(stroke.drawnWidth, 28)
+        // On black, a 40% yellow highlighter gives ~40% of yellow's value, not full yellow.
+        let context = CGContext(data: nil, width: 160, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(gray: 0, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 160, height: 100))
+        let flat = AnnotationRenderer.flatten(context.makeImage()!, annotations: [Annotation(.stroke(stroke))])!
+        let center = pixel(flat, x: 80, y: 50), nearEdge = pixel(flat, x: 80, y: 38)
+        XCTAssertEqual(Double(center[0]), 255 * Stroke.highlighterAlpha, accuracy: 12)
+        XCTAssertEqual(center[0], nearEdge[0], "14 px off center is still inside the 28 px stroke")
+        XCTAssertLessThan(pixel(flat, x: 80, y: 30)[0], 10, "outside the stroke")
+    }
+
+    func testStrokeHitBoundsAndMove() {
+        let stroke = Annotation(.stroke(Stroke(points: [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0)], color: pink, lineWidth: 4, isHighlighter: false)))
+        XCTAssertNotNil(AnnotationHitTest.hit(CGPoint(x: 50, y: 4), in: [stroke], tolerance: 2))
+        XCTAssertNil(AnnotationHitTest.hit(CGPoint(x: 50, y: 10), in: [stroke], tolerance: 2))
+        XCTAssertEqual(stroke.bounds, CGRect(x: -2, y: -2, width: 104, height: 4))
+        guard case .stroke(let moved) = stroke.moved(by: CGVector(dx: 3, dy: 4)).kind else { return XCTFail() }
+        XCTAssertEqual(moved.points, [CGPoint(x: 3, y: 4), CGPoint(x: 103, y: 4)])
+    }
+
+    // MARK: Badges
+
+    func testBadgesRenumberInOrder() {
+        let badges = (1...3).map { Annotation(.badge(Badge(center: CGPoint(x: $0 * 50, y: 50), number: $0, color: pink, fontSize: 36))) }
+        let arrow = Annotation(.arrow(Arrow(start: .zero, end: CGPoint(x: 10, y: 10), color: pink, lineWidth: 4)))
+        let afterDelete = Annotation.numberingBadges([badges[0], arrow, badges[2]])
+        let numbers = afterDelete.compactMap { if case .badge(let b) = $0.kind { return b.number } else { return nil } }
+        XCTAssertEqual(numbers, [1, 2], "deleting 2 makes 3 the new 2")
+        XCTAssertEqual(afterDelete[1], arrow)
+        XCTAssertEqual(Annotation.nextBadgeNumber(in: afterDelete), 3)
+    }
+
+    func testBadgeDrawsFilledCircleWithNumber() {
+        let badge = Badge(center: CGPoint(x: 50, y: 50), number: 1, color: RGBAColor.presets[3], fontSize: 36)
+        XCTAssertEqual(badge.diameter, 47)
+        let flat = AnnotationRenderer.flatten(white(width: 100, height: 100), annotations: [Annotation(.badge(badge))])!
+        let fill = pixel(flat, x: 50 - 15, y: 50) // inside the circle, left of the digit
+        XCTAssertLessThan(fill[0], 40); XCTAssertGreaterThan(fill[2], 200)
+        XCTAssertTrue(isWhite(pixel(flat, x: 5, y: 5)))
+        // The white digit sits in the middle: some pixels across the center are white.
+        let row = (40...60).map { pixel(flat, x: $0, y: 50) }
+        XCTAssertTrue(row.contains { $0[0] > 200 && $0[1] > 200 }, "digit drawn at the center")
+    }
+
+    func testBadgeWidensForTwoDigits() {
+        let one = Badge(center: .zero, number: 7, color: pink, fontSize: 36)
+        var twelve = one; twelve.number = 12
+        XCTAssertEqual(BadgeLayout.frame(one).width, one.diameter)
+        XCTAssertGreaterThan(BadgeLayout.frame(twelve).width, one.diameter)
+        XCTAssertEqual(BadgeLayout.frame(twelve).height, one.diameter)
+    }
+
+    func testNewKindsRoundTripAsJSON() throws {
+        let list = [
+            Annotation(.shape(ShapeMark(form: .ellipse, rect: CGRect(x: 1, y: 2, width: 3, height: 4), color: pink, lineWidth: 8))),
+            Annotation(.stroke(Stroke(points: [.zero, CGPoint(x: 5, y: 5)], color: pink, lineWidth: 4, isHighlighter: true))),
+            Annotation(.badge(Badge(center: CGPoint(x: 9, y: 9), number: 1, color: pink, fontSize: 24))),
+        ]
+        XCTAssertEqual(try JSONDecoder().decode([Annotation].self, from: JSONEncoder().encode(list)), list)
+    }
+}
