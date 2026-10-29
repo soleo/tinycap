@@ -189,15 +189,16 @@ h1 { font-size: clamp(36px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.
 
 /* ---------- Screenshots ---------- */
 
-.shots { align-items: start; }
-.shots > div > p { margin-top: 0; }
+.shots { align-items: center; }
+.shots p { font-size: 19px; margin: 0; }
+.shot-tiles { margin-top: 36px; }
 .markup { margin: 0; }
 .markup svg {
   display: block; width: 100%; height: auto; border-radius: var(--radius);
   border: 3px solid var(--line); box-shadow: 8px 8px 0 var(--line); background: #f4f3f8;
 }
 .markup figcaption { font-size: 14px; color: var(--ink-soft); margin-top: 12px; text-align: center; }
-.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
 
 .keys { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .keys th, .keys td { padding: 13px 18px; text-align: left; border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); }
@@ -235,7 +236,7 @@ kbd {
 }
 @media (max-width: 560px) {
   body { font-size: 16px; }
-  .grid, .grid.two, .steps { grid-template-columns: 1fr; }
+  .grid, .steps { grid-template-columns: 1fr; }
   .compact-hide { display: none; }
   .lead { font-size: 18px; }
   .menu { right: 10px; width: 190px; }
