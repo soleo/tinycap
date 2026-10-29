@@ -7,12 +7,14 @@ import TinycapCore
 final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let coordinator: RecordingCoordinator
+    private let screenshots: ScreenshotCoordinator
     private let openSettings: () -> Void
     private let menu = NSMenu()
     private var timerTask: Task<Void, Never>?
 
-    init(coordinator: RecordingCoordinator, openSettings: @escaping () -> Void) {
+    init(coordinator: RecordingCoordinator, screenshots: ScreenshotCoordinator, openSettings: @escaping () -> Void) {
         self.coordinator = coordinator
+        self.screenshots = screenshots
         self.openSettings = openSettings
         super.init()
         menu.delegate = self
@@ -99,6 +101,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
+        // Screenshots first (SS-1): Area / Window / Screen.
+        for (title, mode) in [("Screenshot Area", CaptureMode.area), ("Screenshot Window", .window), ("Screenshot Screen", .screen)] {
+            let item = NSMenuItem(title: title, action: #selector(screenshot(_:)), keyEquivalent: "")
+            if mode == .area, let combo = ShortcutManager.shared.combo(for: .screenshotArea) {
+                if let key = combo.menuKeyEquivalent {
+                    item.keyEquivalent = key
+                    item.keyEquivalentModifierMask = combo.eventModifierFlags
+                } else {
+                    item.toolTip = combo.displayString
+                }
+            }
+            item.representedObject = mode.rawValue
+            item.target = self
+            item.isEnabled = !busy
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+
         for (action, mode) in [(ShortcutAction.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
             let combo = ShortcutManager.shared.combo(for: action)
             let item = NSMenuItem(title: action.title, action: #selector(record(_:)), keyEquivalent: combo?.menuKeyEquivalent ?? "")
@@ -166,6 +186,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func record(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let mode = CaptureMode(rawValue: raw) else { return }
         coordinator.begin(mode)
+    }
+
+    @objc private func screenshot(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = CaptureMode(rawValue: raw) else { return }
+        screenshots.begin(mode)
     }
 
     @objc private func openRecent(_ sender: NSMenuItem) {

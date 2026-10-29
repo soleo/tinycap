@@ -1,5 +1,13 @@
 import AppKit
 
+/// Why the overlay is up: it changes the wording and, for areas, the control bar.
+enum SelectionPurpose: Sendable {
+    case record, screenshot
+
+    /// "record" / "capture", for prompts like "Click a window to record".
+    var verb: String { self == .record ? "record" : "capture" }
+}
+
 /// Borderless, transparent panel covering one display, used by all selection modes.
 final class OverlayPanel: NSPanel {
     let screenFrame: CGRect

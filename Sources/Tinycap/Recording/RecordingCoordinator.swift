@@ -20,6 +20,8 @@ final class RecordingCoordinator {
     }
 
     var onStateChange: ((State) -> Void)?
+    /// False while a screenshot is being taken, so the two overlays never stack.
+    var canStart: () -> Bool = { true }
 
     /// Selecting, counting down, recording, saving or exporting: no update reminders now (UP-3).
     var isBusy: Bool {
@@ -45,7 +47,7 @@ final class RecordingCoordinator {
     // MARK: - Start
 
     func begin(_ mode: CaptureMode) {
-        guard state == .idle else { return }
+        guard state == .idle, canStart() else { return }
         // No CGPreflightScreenCaptureAccess gate here: it can stay false after the user
         // grants access until the app restarts. ScreenCaptureKit gives the real answer.
         state = .selecting
@@ -55,7 +57,7 @@ final class RecordingCoordinator {
                 // Fail before recording, not after, if the save folder isn't writable.
                 _ = try SaveLocation.shared.preparedFolder()
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let selection = await select(mode, content: content) else {
+                guard let selection = await CaptureSelector.select(mode, content: content, purpose: .record) else {
                     state = .idle
                     return
                 }
@@ -80,40 +82,6 @@ final class RecordingCoordinator {
                     present(error, title: "Tinycap couldn't start recording")
                 }
             }
-        }
-    }
-
-    /// What the user picked, plus where to draw the border and the countdown
-    /// (both in AppKit global coordinates).
-    private struct Selection {
-        var target: CaptureTarget
-        var borderRect: CGRect?
-        var countdownRect: CGRect?
-    }
-
-    private func select(_ mode: CaptureMode, content: SCShareableContent) async -> Selection? {
-        switch mode {
-        case .area:
-            guard let selection = await AreaSelectionController().run(),
-                  let display = content.displays.first(where: { $0.displayID == selection.displayID })
-            else { return nil }
-            let local = Geometry.displayLocalRect(selection.globalRect, screenFrame: selection.screenFrame)
-            return Selection(target: .area(display, rect: local), borderRect: selection.globalRect, countdownRect: selection.globalRect)
-
-        case .window:
-            guard let windowID = await WindowPickerController(content: content).run(),
-                  let window = content.windows.first(where: { $0.windowID == windowID })
-            else { return nil }
-            let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-            let frame = Geometry.appKitRect(fromCG: window.frame, primaryScreenHeight: primaryHeight)
-            return Selection(target: .window(window), countdownRect: frame)
-
-        case .screen:
-            guard let displayID = await ScreenPickerController().run(),
-                  let display = content.displays.first(where: { $0.displayID == displayID })
-            else { return nil }
-            let frame = NSScreen.screens.first { $0.displayID == displayID }?.frame
-            return Selection(target: .display(display), countdownRect: frame)
         }
     }
 

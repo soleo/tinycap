@@ -5,6 +5,13 @@ import Foundation
 /// Supported tokens: `{date}` (yyyy-MM-dd), `{time}` (HH.mm), `{seconds}` (ss).
 public struct FilenamePattern: Sendable, Equatable {
     public static let defaultPattern = "Recording {date} at {time}"
+    public static let defaultScreenshotPattern = "Screenshot {date} at {time}"
+
+    /// Screenshots use "Screenshot …" while the pattern is the default; a custom pattern
+    /// applies to both.
+    public var forScreenshots: FilenamePattern {
+        pattern == Self.defaultPattern ? FilenamePattern(Self.defaultScreenshotPattern) : self
+    }
 
     public let pattern: String
 

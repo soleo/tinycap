@@ -14,13 +14,15 @@ final class WindowPickerController {
     }
 
     private let candidates: [Candidate]
+    private let purpose: SelectionPurpose
     private var panels: [OverlayPanel] = []
     private var views: [WindowPickerView] = []
     private var hovered: Candidate?
     private var continuation: CheckedContinuation<CGWindowID?, Never>?
 
-    init(content: SCShareableContent) {
+    init(content: SCShareableContent, purpose: SelectionPurpose = .record) {
         candidates = Self.candidates(from: content)
+        self.purpose = purpose
     }
 
     /// Returns the chosen window's ID, or nil if cancelled.
@@ -60,7 +62,7 @@ final class WindowPickerController {
     private func show() {
         for screen in NSScreen.screens {
             let panel = OverlayPanel(screen: screen)
-            let view = WindowPickerView(frame: CGRect(origin: .zero, size: screen.frame.size), screenFrame: screen.frame)
+            let view = WindowPickerView(frame: CGRect(origin: .zero, size: screen.frame.size), screenFrame: screen.frame, verb: purpose.verb)
             view.onMove = { [weak self] in self?.updateHover() }
             view.onClick = { [weak self] in self?.clicked() }
             view.onCancel = { [weak self] in self?.finish(nil) }
@@ -111,13 +113,15 @@ final class WindowPickerView: NSView {
     }
 
     private let screenFrame: CGRect
+    private let verb: String
 
-    init(frame: NSRect, screenFrame: CGRect) {
+    init(frame: NSRect, screenFrame: CGRect, verb: String) {
         self.screenFrame = screenFrame
+        self.verb = verb
         super.init(frame: frame)
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Window selection. Click a window to record it, press Escape to cancel.")
+        setAccessibilityLabel("Window selection. Click a window to \(verb) it, press Escape to cancel.")
     }
 
     @available(*, unavailable)
@@ -147,7 +151,7 @@ final class WindowPickerView: NSView {
         bounds.fill()
 
         guard let highlight else {
-            OverlayLabel.draw("Click a window to record · Esc to cancel",
+            OverlayLabel.draw("Click a window to \(verb) · Esc to cancel",
                               centeredAt: CGPoint(x: bounds.midX, y: bounds.midY), in: bounds, fontSize: 15)
             return
         }
@@ -162,7 +166,7 @@ final class WindowPickerView: NSView {
         path.stroke()
 
         let visible = local.intersection(bounds)
-        OverlayLabel.draw(highlight.title.isEmpty ? "Click to record" : "\(highlight.title) · Click to record",
+        OverlayLabel.draw(highlight.title.isEmpty ? "Click to \(verb)" : "\(highlight.title) · Click to \(verb)",
                           centeredAt: CGPoint(x: visible.midX, y: visible.midY), in: bounds, fontSize: 13)
     }
 }

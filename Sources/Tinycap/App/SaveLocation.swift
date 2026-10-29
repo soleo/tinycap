@@ -27,9 +27,10 @@ final class SaveLocation {
     }
 
     /// A new, unused file URL in the save folder named by the user's filename pattern.
-    func nextDestination(pathExtension: String, date: Date = Date()) throws -> URL {
+    func nextDestination(pathExtension: String, date: Date = Date(), screenshot: Bool = false) throws -> URL {
         let folder = try preparedFolder()
-        let pattern = FilenamePattern(defaults.string(forKey: PreferenceKey.filenamePattern) ?? "")
+        var pattern = FilenamePattern(defaults.string(forKey: PreferenceKey.filenamePattern) ?? "")
+        if screenshot { pattern = pattern.forScreenshots }
         return FilenamePattern.uniqueURL(in: folder, baseName: pattern.baseName(for: date), pathExtension: pathExtension)
     }
 
