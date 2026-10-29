@@ -249,7 +249,7 @@ final class RecordingCoordinator {
     /// Masters left behind by a quit or crash (RC reliability). Offered once at launch.
     func offerUnsavedRecordings() {
         let files = (try? FileManager.default.contentsOfDirectory(
-            at: Self.mastersFolder, includingPropertiesForKeys: [.contentModificationDateKey]
+            at: Self.mastersFolder, includingPropertiesForKeys: nil
         )) ?? []
         let masters = files.filter { $0.pathExtension == "mov" }
         guard !masters.isEmpty else { return }

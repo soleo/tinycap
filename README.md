@@ -157,9 +157,22 @@ Two known, harmless messages appear during the release build:
 - `ld: warning: no platform load command found in '…libvpx.a[x86_64](….asm.o)'`: nasm doesn't tag its object files with a macOS version, and the linker correctly assumes macOS.
 - `hdiutil: WARNING: … is deprecated`: `hdiutil create` still works; the script will move to `diskutil image` once it's verified on a release machine.
 
+### App Store
+
+`scripts/make-appstore.sh` builds the Mac App Store package. It's the same app with `CHANNEL=appstore`: no Sparkle, no update check and no network entitlement, signed with an Apple Distribution certificate and the App Store provisioning profile, then wrapped in a signed installer package.
+
+```sh
+SIGN_IDENTITY="Apple Distribution: Your Name (TEAMID)" \
+INSTALLER_IDENTITY="3rd Party Mac Developer Installer: Your Name (TEAMID)" \
+PROVISIONING_PROFILE=~/path/Tinycap_App_Store.provisionprofile \
+  scripts/make-appstore.sh            # → build/appstore/Tinycap-<version>.pkg
+```
+
+Upload the package with Apple's Transporter app, try it through TestFlight, then submit the build for review in App Store Connect. Each upload needs a higher build number than the last; the commit count gives one per merged commit.
+
 ### Updates
 
-The direct build embeds [Sparkle](https://sparkle-project.org) 2.10.0 (`scripts/fetch-sparkle.sh`, pinned by SHA-256) and checks the appcast once a day. The App Store build (`CHANNEL=appstore scripts/build-app.sh`) has no Sparkle; it asks Apple's lookup API for the store version once a day and sends people to the App Store page. Both show a dot on the menu-bar icon, an "Update to Tinycap X.Y…" menu item and one quiet notification per version, and nothing appears while you select, record or export. A direct build made without `Resources/sparkle-public-key.txt` has no updater.
+The direct build embeds [Sparkle](https://sparkle-project.org) 2.10.0 (`scripts/fetch-sparkle.sh`, pinned by SHA-256) and checks the appcast once a day. The App Store build (`CHANNEL=appstore`) has no updater and no network access: the App Store updates it. The direct build shows a dot on the menu-bar icon, an "Update to Tinycap X.Y…" menu item and one quiet notification per version, and nothing appears while you select, record or export. A direct build made without `Resources/sparkle-public-key.txt` has no updater.
 
 The version comes from the `VERSION` file (or `VERSION=1.2.3`). The build number is the commit count, for local builds too.
 

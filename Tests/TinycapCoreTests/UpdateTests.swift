@@ -74,22 +74,3 @@ final class UpdatePolicyTests: XCTestCase {
         XCTAssertEqual(UpdatePolicy(defaults: defaults), policy)
     }
 }
-
-final class AppStoreLookupTests: XCTestCase {
-    func testURL() {
-        XCTAssertEqual(AppStoreLookup.url(bundleID: "app.tinycap.Tinycap")?.absoluteString,
-                       "https://itunes.apple.com/lookup?bundleId=app.tinycap.Tinycap")
-    }
-
-    func testParsesFirstResult() {
-        let json = #"{"resultCount":1,"results":[{"version":"1.2.0","releaseNotes":"Faster GIFs","trackViewUrl":"https://apps.apple.com/app/id123","bundleId":"app.tinycap.Tinycap"}]}"#
-        XCTAssertEqual(AppStoreLookup.parse(Data(json.utf8)), AvailableUpdate(
-            version: "1.2.0", releaseNotes: "Faster GIFs", storeURL: URL(string: "https://apps.apple.com/app/id123")))
-    }
-
-    func testNotListedOrMalformed() {
-        XCTAssertNil(AppStoreLookup.parse(Data(#"{"resultCount":0,"results":[]}"#.utf8)))
-        XCTAssertNil(AppStoreLookup.parse(Data("not json".utf8)))
-    }
-}
-

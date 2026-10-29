@@ -27,17 +27,14 @@ public struct AppVersion: Comparable, Sendable, CustomStringConvertible {
     }
 }
 
-/// A newer version that was found, from either the App Store or the appcast.
+/// A newer version that was found in the appcast.
 public struct AvailableUpdate: Sendable, Equatable {
     public var version: String
     public var releaseNotes: String?
-    /// App Store page (App Store build). Nil for Sparkle, which installs in place.
-    public var storeURL: URL?
 
-    public init(version: String, releaseNotes: String? = nil, storeURL: URL? = nil) {
+    public init(version: String, releaseNotes: String? = nil) {
         self.version = version
         self.releaseNotes = releaseNotes
-        self.storeURL = storeURL
     }
 }
 
@@ -121,33 +118,3 @@ public struct UpdatePolicy: Sendable, Equatable {
         defaults.set(notifiedVersions, forKey: Key.notifiedVersions)
     }
 }
-
-/// Apple's public lookup API, used by the App Store build only (no download or install:
-/// App Store apps must update through the store).
-public enum AppStoreLookup {
-    public static func url(bundleID: String) -> URL? {
-        var components = URLComponents(string: "https://itunes.apple.com/lookup")
-        components?.queryItems = [URLQueryItem(name: "bundleId", value: bundleID)]
-        return components?.url
-    }
-
-    /// Parses `{"resultCount":1,"results":[{"version":"1.2","releaseNotes":"…","trackViewUrl":"…"}]}`.
-    /// Nil when the app isn't listed (resultCount 0) or the JSON is malformed.
-    public static func parse(_ data: Data) -> AvailableUpdate? {
-        struct Response: Decodable {
-            struct Result: Decodable {
-                let version: String
-                let releaseNotes: String?
-                let trackViewUrl: String?
-            }
-            let results: [Result]
-        }
-        guard let first = (try? JSONDecoder().decode(Response.self, from: data))?.results.first else { return nil }
-        return AvailableUpdate(
-            version: first.version,
-            releaseNotes: first.releaseNotes,
-            storeURL: first.trackViewUrl.flatMap(URL.init(string:))
-        )
-    }
-}
-

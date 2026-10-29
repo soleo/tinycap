@@ -128,11 +128,17 @@ struct UpdateSettingsSection: View {
     @State private var updates = UpdateController.shared
 
     var body: some View {
+        #if APP_STORE
+        Section("Updates") {
+            Text("The App Store keeps Tinycap up to date.").foregroundStyle(.secondary)
+        }
+        #else
         if updates.isAvailable { controls } else {
             Section("Updates") {
                 Text("This build of Tinycap can't check for updates.").foregroundStyle(.secondary)
             }
         }
+        #endif
     }
 
     @ViewBuilder private var controls: some View {
@@ -158,11 +164,7 @@ struct UpdateSettingsSection: View {
     }
 
     private var footer: String {
-        #if SPARKLE
         "The only network request Tinycap makes. It fetches the release list from GitHub; nothing about you or this Mac is sent."
-        #else
-        "The only network request Tinycap makes. It asks the App Store for the latest version number; nothing about you or this Mac is sent."
-        #endif
     }
 
     static func lastCheckText(_ updates: UpdateController) -> String {

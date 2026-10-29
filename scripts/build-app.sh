@@ -5,7 +5,10 @@
 #   scripts/build-app.sh                 # release, universal, ad-hoc signed
 #   CONFIG=debug scripts/build-app.sh    # debug, current arch only
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh
-#   CHANNEL=appstore scripts/build-app.sh   # App Store build: no Sparkle
+#   CHANNEL=appstore scripts/build-app.sh   # App Store build: no Sparkle, no network
+#
+# PROVISIONING_PROFILE=<path> embeds that profile and adds its application and team
+# identifiers to the entitlements. The App Store build needs one (scripts/make-appstore.sh).
 #
 # CHANNEL=direct (default) embeds Sparkle for in-place updates. Its EdDSA public key
 # comes from Resources/sparkle-public-key.txt; without it the build has no updater
@@ -123,6 +126,8 @@ if [[ "$USE_SPARKLE" == 1 ]]; then
 fi
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 cp "$ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
+# Privacy manifest: no tracking, no data collected, UserDefaults for the app's own settings.
+cp "$ROOT/Resources/PrivacyInfo.xcprivacy" "$APP/Contents/Resources/PrivacyInfo.xcprivacy"
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 else
@@ -147,12 +152,33 @@ if [[ "$USE_SPARKLE" == 1 ]]; then
   codesign "${nested_flags[@]}" "$APP/Contents/Frameworks/Sparkle.framework"
 
   # The installer service is reached by mach name; the sandbox needs these exceptions.
+  # Network access is for the update check and download only, so only this build has it.
   ENTITLEMENTS="$OUT/Tinycap-direct.entitlements"
   cp "$ROOT/Resources/Tinycap.entitlements" "$ENTITLEMENTS"
   /usr/libexec/PlistBuddy \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name array" \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name:0 string $BUNDLE_ID-spks" \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name:1 string $BUNDLE_ID-spki" \
+    -c "Add :com.apple.security.network.client bool true" \
+    "$ENTITLEMENTS"
+fi
+
+if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
+  echo "==> Embedding provisioning profile"
+  PROFILE_PLIST="$OUT/profile.plist"
+  security cms -D -i "$PROVISIONING_PROFILE" > "$PROFILE_PLIST" \
+    || { echo "error: can't read $PROVISIONING_PROFILE" >&2; exit 1; }
+  APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$PROFILE_PLIST")"
+  TEAM_ID="$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$PROFILE_PLIST")"
+  [[ "$APP_IDENTIFIER" == "$TEAM_ID.$BUNDLE_ID" ]] \
+    || { echo "error: the profile is for $APP_IDENTIFIER, not $TEAM_ID.$BUNDLE_ID" >&2; exit 1; }
+  cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"
+  # The signature must claim the same identifiers the profile grants.
+  cp "$ENTITLEMENTS" "$OUT/Tinycap-$CHANNEL-signed.entitlements"
+  ENTITLEMENTS="$OUT/Tinycap-$CHANNEL-signed.entitlements"
+  /usr/libexec/PlistBuddy \
+    -c "Add :com.apple.application-identifier string $APP_IDENTIFIER" \
+    -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
     "$ENTITLEMENTS"
 fi
 
