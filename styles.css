@@ -91,6 +91,11 @@ h1 { font-size: clamp(36px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.
 .lead strong { color: var(--ink); }
 .cta { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .fine { font-size: 14px; color: var(--ink-soft); margin: 0; }
+.fine.brew { margin-top: 10px; }
+.fine code {
+  font: 600 13px var(--mono); color: var(--ink); padding: 2px 7px; border-radius: 6px;
+  background: var(--tile); border: 1px solid var(--line); display: inline-block; max-width: 100%; overflow-wrap: anywhere; user-select: all;
+}
 
 /* Beveled, pixel-outlined buttons, like the icon's tile. */
 .button {
