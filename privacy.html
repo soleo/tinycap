@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Tinycap</title>
+  <meta name="description" content="Tinycap's privacy policy: it collects no data, has no account or analytics, and keeps your recordings and screenshots on your Mac.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css?v=0.4.0">
+  <style>
+    .policy { max-width: 46em; }
+    .policy h1 { font-size: clamp(32px, 4.6vw, 48px); }
+    .policy h2 { font-size: 22px; margin: 36px 0 10px; }
+    .policy p, .policy li { color: var(--ink-soft); font-size: 17px; line-height: 1.6; }
+    .policy ul { padding-left: 22px; }
+    .policy .fine { margin-top: 36px; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="./" aria-label="Tinycap home">
+      <img src="assets/favicon-64.png" width="28" height="28" alt="">
+      <span>Tinycap</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="./">Home</a>
+      <a href="https://github.com/soleo/tinycap/releases">Changelog</a>
+      <a href="https://github.com/soleo/tinycap">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main" class="section policy">
+    <h1>Privacy</h1>
+    <p class="lead">Tinycap collects no data. It has no account, no analytics and no ads, and your recordings and screenshots stay on your Mac.</p>
+
+    <h2>Your recordings and screenshots</h2>
+    <p>Tinycap writes files only to the folder you choose (~/Movies/Tinycap unless you pick another) and to its own temporary folder while a recording is being trimmed. Nothing is uploaded. Screenshots are saved without location, camera or device details.</p>
+
+    <h2>Screen Recording permission</h2>
+    <p>macOS asks you to allow Screen Recording the first time you capture. Tinycap uses it only while you are selecting, recording or taking a screenshot, and only for the window, screen or area you pick.</p>
+
+    <h2>Network</h2>
+    <ul>
+      <li><strong>App Store version:</strong> makes no network connections. The App Store handles updates.</li>
+      <li><strong>Direct download:</strong> once a day, if "Check for updates daily" is on, it fetches the list of releases from GitHub, and downloads an update from GitHub when you choose to install one. No information about you or your Mac is added to those requests. GitHub sees them as it sees any web request; see <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</li>
+    </ul>
+
+    <h2>Bug reports and feedback</h2>
+    <p>Report a Bug and Send Feedback open a form on GitHub in your browser. A bug report fills in Tinycap's version and build, your macOS version, your Mac's chip and how you installed Tinycap; you can see and change all of it before you submit, and nothing is sent unless you do. Copy Diagnostics puts the same details on your clipboard and sends nothing.</p>
+
+    <h2>Children</h2>
+    <p>Tinycap collects nothing from anyone, including children.</p>
+
+    <h2>Changes and contact</h2>
+    <p>If this policy changes, the new version will be posted on this page with a new date. Questions: <a href="https://github.com/soleo/tinycap/issues">open an issue on GitHub</a>.</p>
+
+    <p class="fine">Effective October 28, 2026.</p>
+  </main>
+
+  <footer class="foot">
+    <p>Tinycap · MIT License · <a href="privacy.html">Privacy</a> · Made for the Mac. Not affiliated with Apple.</p>
+  </footer>
+</body>
+</html>
