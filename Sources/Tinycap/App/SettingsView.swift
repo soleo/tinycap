@@ -30,6 +30,8 @@ struct SettingsView: View {
                 .tabItem { Label("Recording", systemImage: "record.circle") }
             ExportSettingsView()
                 .tabItem { Label("Export", systemImage: "square.and.arrow.up") }
+            ScreenshotSettingsView()
+                .tabItem { Label("Screenshot", systemImage: "camera.viewfinder") }
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -284,6 +286,78 @@ private struct AboutSettingsView: View {
                     .truncationMode(.middle)
             }
         }
+    }
+}
+
+/// Settings → Screenshot: after capture, format, scale, window shadow, default style.
+private struct ScreenshotSettingsView: View {
+    @State private var settings = ScreenshotSettings(defaults: .standard)
+
+    var body: some View {
+        Form {
+            Picker("After taking a screenshot", selection: $settings.afterCapture) {
+                ForEach(AfterCapture.allCases) { Text($0.displayName).tag($0) }
+            }
+            Picker("Format", selection: $settings.format) {
+                ForEach(ScreenshotFormat.allCases) { Text($0.displayName).tag($0) }
+            }
+            if settings.format == .jpeg {
+                LabeledContent("JPEG quality") {
+                    HStack {
+                        Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: $settings.jpegQuality, in: 0.3...1).accessibilityLabel("JPEG quality")
+                        Text("Better").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Picker("Scale", selection: $settings.scale) {
+                ForEach(ScreenshotScale.allCases) { Text($0.displayName).tag($0) }
+            }
+            Toggle("Include the window shadow", isOn: $settings.windowShadow)
+            Text("Window screenshots keep their transparent corners. Saved files carry no location or device details.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Section("Default annotation style") {
+                LabeledContent("Color") {
+                    HStack(spacing: 6) {
+                        ForEach(Array(RGBAColor.presets.enumerated()), id: \.offset) { _, color in
+                            Button {
+                                settings.style.color = color
+                            } label: {
+                                Circle()
+                                    .fill(Color(cgColor: color.cgColor))
+                                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.25)))
+                                    .frame(width: 16, height: 16)
+                                    .padding(2)
+                                    .overlay(Circle().strokeBorder(Color.accentColor, lineWidth: settings.style.color == color ? 2 : 0))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                Picker("Arrow thickness", selection: $settings.style.lineWidth) {
+                    Text("Thin").tag(AnnotationStyle.lineWidths[0])
+                    Text("Medium").tag(AnnotationStyle.lineWidths[1])
+                    Text("Thick").tag(AnnotationStyle.lineWidths[2])
+                    if !AnnotationStyle.lineWidths.contains(settings.style.lineWidth) {
+                        Text("\(Int(settings.style.lineWidth)) px").tag(settings.style.lineWidth)
+                    }
+                }
+                Picker("Text size", selection: $settings.style.fontSize) {
+                    Text("Small").tag(AnnotationStyle.fontSizes[0])
+                    Text("Medium").tag(AnnotationStyle.fontSizes[1])
+                    Text("Large").tag(AnnotationStyle.fontSizes[2])
+                    if !AnnotationStyle.fontSizes.contains(settings.style.fontSize) {
+                        Text("\(Int(settings.style.fontSize)) px").tag(settings.style.fontSize)
+                    }
+                }
+                Toggle("Text background", isOn: $settings.style.textBackground)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { settings = ScreenshotSettings(defaults: .standard) }
+        .onChange(of: settings) { _, new in new.save(to: .standard) }
     }
 }
 

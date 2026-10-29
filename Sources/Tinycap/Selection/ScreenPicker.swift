@@ -7,6 +7,11 @@ final class ScreenPickerController {
     private var panels: [OverlayPanel] = []
     private var views: [ScreenPickerView] = []
     private var continuation: CheckedContinuation<CGDirectDisplayID?, Never>?
+    private let purpose: SelectionPurpose
+
+    init(purpose: SelectionPurpose = .record) {
+        self.purpose = purpose
+    }
 
     /// Returns the chosen display's ID, or nil if cancelled.
     func run() async -> CGDirectDisplayID? {
@@ -21,7 +26,7 @@ final class ScreenPickerController {
     private func show(_ screens: [NSScreen]) {
         for (index, screen) in screens.enumerated() {
             let panel = OverlayPanel(screen: screen)
-            let view = ScreenPickerView(frame: CGRect(origin: .zero, size: screen.frame.size), name: "\(screen.localizedName) (\(index + 1) of \(screens.count))")
+            let view = ScreenPickerView(frame: CGRect(origin: .zero, size: screen.frame.size), name: "\(screen.localizedName) (\(index + 1) of \(screens.count))", verb: purpose.verb)
             let displayID = screen.displayID
             view.onClick = { [weak self] in self?.finish(displayID) }
             view.onCancel = { [weak self] in self?.finish(nil) }
@@ -51,16 +56,18 @@ final class ScreenPickerView: NSView {
     var onClick: (() -> Void)?
     var onCancel: (() -> Void)?
     private let name: String
+    private let verb: String
     private var hovering = false {
         didSet { if hovering != oldValue { needsDisplay = true } }
     }
 
-    init(frame: NSRect, name: String) {
+    init(frame: NSRect, name: String, verb: String) {
         self.name = name
+        self.verb = verb
         super.init(frame: frame)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Record \(name)")
+        setAccessibilityLabel("\(verb.capitalized) \(name)")
     }
 
     @available(*, unavailable)
@@ -105,7 +112,7 @@ final class ScreenPickerView: NSView {
             NSColor.black.withAlphaComponent(0.35).setFill()
             bounds.fill()
         }
-        OverlayLabel.draw("Click to record \(name) · Esc to cancel",
+        OverlayLabel.draw("Click to \(verb) \(name) · Esc to cancel",
                           centeredAt: CGPoint(x: bounds.midX, y: bounds.midY), in: bounds, fontSize: 15)
     }
 }

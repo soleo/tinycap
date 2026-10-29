@@ -16,6 +16,11 @@ final class AreaSelectionController {
     private var panels: [OverlayPanel] = []
     private var views: [AreaSelectionView] = []
     private var continuation: CheckedContinuation<AreaSelection?, Never>?
+    private let purpose: SelectionPurpose
+
+    init(purpose: SelectionPurpose = .record) {
+        self.purpose = purpose
+    }
 
     func run() async -> AreaSelection? {
         await withCheckedContinuation { continuation in
@@ -28,7 +33,7 @@ final class AreaSelectionController {
         let mouseScreen = NSScreen.withMouse
         for screen in NSScreen.screens {
             let panel = OverlayPanel(screen: screen)
-            let view = AreaSelectionView(frame: CGRect(origin: .zero, size: screen.frame.size))
+            let view = AreaSelectionView(frame: CGRect(origin: .zero, size: screen.frame.size), purpose: purpose)
             view.onBeginSelection = { [weak self, weak view] in
                 self?.views.forEach { if $0 !== view { $0.clearSelection() } }
             }
@@ -79,18 +84,20 @@ final class AreaSelectionView: NSView {
     private var selection: CGRect?
     private var drag: Drag = .none
     private var cursorPoint: CGPoint?
-    private lazy var controlBar = AreaControlBar(
-        onRecord: { [weak self] in self?.confirm() },
-        onCancel: { [weak self] in self?.onCancel?() }
-    )
+    private let controlBar: AreaControlBar
 
-    override init(frame: NSRect) {
+    init(frame: NSRect, purpose: SelectionPurpose) {
+        var confirm: () -> Void = {}
+        var cancel: () -> Void = {}
+        controlBar = AreaControlBar(purpose: purpose, onRecord: { confirm() }, onCancel: { cancel() })
         super.init(frame: frame)
+        confirm = { [weak self] in self?.confirm() }
+        cancel = { [weak self] in self?.onCancel?() }
         controlBar.isHidden = true
         addSubview(controlBar)
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Area selection. Drag to select an area, press Return to record, Escape to cancel.")
+        setAccessibilityLabel("Area selection. Drag to select an area, press Return to \(purpose.verb), Escape to cancel.")
     }
 
     @available(*, unavailable)
@@ -304,14 +311,15 @@ final class AreaSelectionView: NSView {
     }
 }
 
-/// Floating bar under the selection: frame rate, cursor toggle, Cancel and Record.
+/// Floating bar under the selection. Recording: frame rate, cursor toggle, Cancel and
+/// Record. Screenshot: Cancel and Capture.
 final class AreaControlBar: NSVisualEffectView {
     private let onRecord: () -> Void
     private let onCancel: () -> Void
     private let fpsPopup = NSPopUpButton()
     private let cursorCheckbox = NSButton(checkboxWithTitle: "Cursor", target: nil, action: nil)
 
-    init(onRecord: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(purpose: SelectionPurpose, onRecord: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.onRecord = onRecord
         self.onCancel = onCancel
         super.init(frame: .zero)
@@ -337,11 +345,12 @@ final class AreaControlBar: NSVisualEffectView {
         cursorCheckbox.action = #selector(cursorChanged)
 
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelClicked))
-        let record = NSButton(title: "Record", target: self, action: #selector(recordClicked))
+        let record = NSButton(title: purpose == .record ? "Record" : "Capture", target: self, action: #selector(recordClicked))
         record.keyEquivalent = "\r"
-        record.bezelColor = .systemRed
+        record.bezelColor = purpose == .record ? .systemRed : .controlAccentColor
 
-        let stack = NSStackView(views: [fpsPopup, cursorCheckbox, cancel, record])
+        let views: [NSView] = purpose == .record ? [fpsPopup, cursorCheckbox, cancel, record] : [cancel, record]
+        let stack = NSStackView(views: views)
         stack.orientation = .horizontal
         stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 8)

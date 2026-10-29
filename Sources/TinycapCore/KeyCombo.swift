@@ -48,10 +48,11 @@ public struct KeyCombo: Codable, Sendable, Hashable {
 }
 
 public enum ShortcutAction: String, CaseIterable, Sendable, Codable {
-    case recordArea, recordWindow, recordScreen, stop
+    case screenshotArea, recordArea, recordWindow, recordScreen, stop
 
     public var title: String {
         switch self {
+        case .screenshotArea: return "Screenshot Area"
         case .recordArea: return "Record Area"
         case .recordWindow: return "Record Window"
         case .recordScreen: return "Record Screen"
@@ -61,10 +62,11 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Codable {
 
     public var defaultsKey: String { "shortcut.\(rawValue)" }
 
-    /// ⌃⌥⌘A / W / S / period.
+    /// ⌃⌥⌘4 for a screenshot (like ⇧⌘4), ⌃⌥⌘A / W / S / period for recording.
     public var defaultCombo: KeyCombo {
         let mods: KeyCombo.Modifiers = [.control, .option, .command]
         switch self {
+        case .screenshotArea: return KeyCombo(keyCode: 0x15, modifiers: mods, keyName: "4")
         case .recordArea: return KeyCombo(keyCode: 0x00, modifiers: mods, keyName: "A")
         case .recordWindow: return KeyCombo(keyCode: 0x0D, modifiers: mods, keyName: "W")
         case .recordScreen: return KeyCombo(keyCode: 0x01, modifiers: mods, keyName: "S")

@@ -4,6 +4,7 @@ import TinycapCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: RecordingCoordinator!
+    private let screenshots = ScreenshotCoordinator()
     private var statusItem: StatusItemController!
     private var controlWindow: ControlWindowController!
     private let settingsWindow = SettingsWindowController()
@@ -12,9 +13,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         PreferenceKey.registerDefaults(in: .standard)
 
+        MainMenu.install()
         coordinator = RecordingCoordinator(onNeedsPermission: { [weak self] in self?.onboarding.show() })
+        coordinator.canStart = { [weak self] in !(self?.screenshots.isSelecting ?? false) }
+        screenshots.canStart = { [weak self] in self?.coordinator.state == .idle }
+        screenshots.onNeedsPermission = { [weak self] in self?.onboarding.show() }
         statusItem = StatusItemController(
             coordinator: coordinator,
+            screenshots: screenshots,
             openSettings: { [weak self] in self?.settingsWindow.show() }
         )
         controlWindow = ControlWindowController(
@@ -43,7 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startUpdates() {
         let updates = UpdateController.shared
-        updates.isBusy = { [weak self] in self?.coordinator.isBusy ?? false }
+        updates.isBusy = { [weak self] in
+            guard let self else { return false }
+            return self.coordinator.isBusy || self.screenshots.isSelecting
+        }
         #if SPARKLE
         updates.start(with: SparkleUpdateChecker())
         #elseif APP_STORE
@@ -57,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         manager.handler = { [weak self] action in
             guard let self else { return }
             switch action {
+            case .screenshotArea: self.screenshots.begin(.area)
             case .recordArea: self.coordinator.begin(.area)
             case .recordWindow: self.coordinator.begin(.window)
             case .recordScreen: self.coordinator.begin(.screen)
