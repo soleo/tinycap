@@ -101,7 +101,14 @@ step "Creating $(basename "$PKG")"
 rm -f "$PKG"
 productbuild --component "$APP" /Applications --sign "$INSTALLER_IDENTITY" "$PKG" >/dev/null \
   || die "productbuild couldn't create the package"
-pkgutil --check-signature "$PKG" | sed -n '1,3p'
+# Read the whole report before trimming it: cutting the pipe short makes pkgutil print
+# "write: Permission denied". Packages signed for the App Store show as "(Development)"
+# here, because only the App Store installs them.
+# pkgutil can exit non-zero for a certificate this Mac doesn't trust for installs, so
+# look for the installer certificate in its report instead.
+signature="$(pkgutil --check-signature "$PKG" 2>&1 || true)"
+[[ "$signature" == *"$INSTALLER_IDENTITY"* ]] || die "the package isn't signed with $INSTALLER_IDENTITY"
+echo "$signature" | sed -n '2,4p'
 
 SIZE="$(du -h "$PKG" | awk '{print $1}')"
 echo
