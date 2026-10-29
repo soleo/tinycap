@@ -172,7 +172,9 @@ if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
   TEAM_ID="$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$PROFILE_PLIST")"
   [[ "$APP_IDENTIFIER" == "$TEAM_ID.$BUNDLE_ID" ]] \
     || { echo "error: the profile is for $APP_IDENTIFIER, not $TEAM_ID.$BUNDLE_ID" >&2; exit 1; }
-  cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"
+  # -X skips the extended attributes a downloaded profile carries, including
+  # com.apple.quarantine, which App Store Connect rejects inside the app (ITMS-91109).
+  cp -X "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"
   # The signature must claim the same identifiers the profile grants.
   cp "$ENTITLEMENTS" "$OUT/Tinycap-$CHANNEL-signed.entitlements"
   ENTITLEMENTS="$OUT/Tinycap-$CHANNEL-signed.entitlements"
@@ -181,6 +183,10 @@ if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
     -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
     "$ENTITLEMENTS"
 fi
+
+# Nothing in the bundle may carry a "downloaded from the internet" mark (ITMS-91109).
+# This is the step that guarantees it; make-appstore.sh checks the result.
+xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 
 echo "==> Signing ($SIGN_IDENTITY, $CHANNEL$( [[ "$USE_SPARKLE" == 1 ]] && echo ", Sparkle" ))"
 sign_flags=(--force --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY")

@@ -111,6 +111,9 @@ entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 [[ "$entitlements" != *temporary-exception* ]] || die "temporary sandbox exceptions in the App Store build"
 [[ "$entitlements" == *"$team.$BUNDLE_ID"* ]] || die "the signature doesn't carry the application identifier"
 codesign --verify --strict --deep "$APP" || die "app signature doesn't verify"
+quarantined="$(xattr -rl "$APP" 2>/dev/null | grep com.apple.quarantine || true)"
+[[ -z "$quarantined" ]] || die "files in the app carry com.apple.quarantine, which App Store Connect rejects:
+$quarantined"
 
 # --- 3. Package ------------------------------------------------------------------
 step "Creating $(basename "$PKG")"
