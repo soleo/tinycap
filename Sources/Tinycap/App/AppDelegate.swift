@@ -55,10 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #if SPARKLE
         updates.start(with: SparkleUpdateChecker())
-        #elseif APP_STORE
-        updates.start(with: AppStoreUpdateChecker())
         #endif
-        // Otherwise (a direct build without a Sparkle key) there is no updater.
+        // The App Store build has no updater: the App Store updates it. A direct build
+        // made without a Sparkle key has none either.
     }
 
     private func registerHotKeys() {

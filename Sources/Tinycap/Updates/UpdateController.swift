@@ -4,14 +4,14 @@ import TinycapCore
 import UserNotifications
 
 /// One per build, chosen at compile time (PRD Technical → Updater):
-/// Sparkle for the direct build, the App Store lookup for the App Store build.
+/// Sparkle in the direct build. The App Store build has none; the App Store updates it.
 @MainActor
 protocol UpdateChecker: AnyObject {
     /// Starts the daily schedule. Found updates are reported to `controller.found(_:)`.
     func start(controller: UpdateController)
     func checkNow(userInitiated: Bool)
     func setAutomaticChecks(_ enabled: Bool)
-    /// Update Now: install in place (direct) or open the App Store page.
+    /// Update Now: install in place.
     func install(_ update: AvailableUpdate)
     /// The checker shows its own window with the three choices (Sparkle does).
     var handlesChoices: Bool { get }

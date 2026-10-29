@@ -2,8 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- App Store build as is. The direct build adds Sparkle's mach-lookup exceptions in
-	     scripts/build-app.sh. No microphone. -->
+	<!-- App Store build as is: no network, no microphone. The direct build adds network
+	     access (update checks and downloads) and Sparkle's mach-lookup exceptions in
+	     scripts/build-app.sh. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
@@ -13,9 +14,6 @@
 	<!-- Default save folder is ~/Movies/Tinycap. Inside the sandbox ~/Movies is a link to
 	     the real folder, which needs this entitlement to write to. -->
 	<key>com.apple.security.assets.movies.read-write</key>
-	<true/>
-	<!-- Used only for the daily update check (and, in the direct build, the download). -->
-	<key>com.apple.security.network.client</key>
 	<true/>
 </dict>
 </plist>
