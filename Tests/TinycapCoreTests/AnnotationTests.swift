@@ -174,7 +174,7 @@ final class ScreenshotSettingsTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "tinycap.tests.screenshot")!
         defaults.removePersistentDomain(forName: "tinycap.tests.screenshot")
         XCTAssertEqual(ScreenshotSettings(defaults: defaults), ScreenshotSettings())
-        XCTAssertEqual(ScreenshotSettings().afterCapture, .openEditor)
+        XCTAssertEqual(ScreenshotSettings().afterCapture, .thumbnail)
         XCTAssertEqual(ScreenshotSettings().format, .png)
 
         var settings = ScreenshotSettings(afterCapture: .copy, format: .jpeg, jpegQuality: 0.6, scale: .standard, windowShadow: false)

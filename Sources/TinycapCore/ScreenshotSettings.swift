@@ -7,12 +7,14 @@ public enum ScreenshotFormat: String, CaseIterable, Codable, Identifiable, Senda
     public var fileExtension: String { self == .png ? "png" : "jpg" }
 }
 
-/// SS-3: what happens right after a screenshot is taken.
+/// SS-3 and SS-4: what happens right after a screenshot is taken.
 public enum AfterCapture: String, CaseIterable, Codable, Identifiable, Sendable {
-    case openEditor, copy, save
+    /// A thumbnail in the screen corner for a few seconds; saved if left alone, as on macOS.
+    case thumbnail, openEditor, copy, save
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
+        case .thumbnail: return "Show a thumbnail"
         case .openEditor: return "Open the editor"
         case .copy: return "Copy to the clipboard"
         case .save: return "Save to the folder"
@@ -41,7 +43,10 @@ public struct ScreenshotSettings: Equatable, Sendable {
     public var windowShadow: Bool
     public var style: AnnotationStyle
 
-    public init(afterCapture: AfterCapture = .openEditor, format: ScreenshotFormat = .png, jpegQuality: Double = 0.85,
+    /// SS-4: how long the thumbnail stays before it saves itself and goes away.
+    public static let thumbnailSeconds: Double = 5
+
+    public init(afterCapture: AfterCapture = .thumbnail, format: ScreenshotFormat = .png, jpegQuality: Double = 0.85,
                 scale: ScreenshotScale = .retina, windowShadow: Bool = true, style: AnnotationStyle = AnnotationStyle()) {
         self.afterCapture = afterCapture
         self.format = format
