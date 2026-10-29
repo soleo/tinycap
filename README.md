@@ -1,19 +1,20 @@
 # Tinycap
 
-A small, native macOS menu-bar screen recorder. Record a window, a screen or a dragged area and save it as a file. Everything stays on your Mac.
+A small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or a dragged area and save it as MP4, WebM or GIF, or take a screenshot and mark it up with arrows, text, pixelation and a crop. Everything stays on your Mac.
 
 Requires macOS 15 Sequoia or later. MIT licensed.
 
 ## Status
 
-Milestones 1–4 are in place: capture, preview with trim, and export to MP4, WebM and GIF.
+Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotation editor, and daily update checks are in place.
 
 **Capture**
-- Menu-bar app with no Dock icon: Record Window, Record Screen, Record Area, Open Recent, Settings, Quit. Opening the app again while it runs shows a small window with the record buttons.
+- Menu-bar app with no Dock icon: Screenshot Area / Window / Screen, Record Window / Screen / Area, Open Recent, Settings, Report a Bug, Send Feedback, Quit. Opening the app again while it runs shows a small window with the record buttons.
 - Area mode: dimmed overlay on every display, drag a rectangle, live W × H in points, move/resize handles, Return to record, Esc to cancel, floating bar with frame rate and cursor toggles
 - Window mode: hover highlights the window under the cursor, click to record; keeps recording when the window moves
 - Screen mode: picks the display straight away, or lets you click one when there are several
 - ScreenCaptureKit (`SCRecordingOutput`) writes an H.264 master; 15/30/60 fps, Retina or 1×, cursor on/off
+- Optional 3-2-1 countdown and click highlights (yellow rings) in every recording mode
 - While recording, the menu-bar icon shows the elapsed time; click it to stop
 
 **Preview and export**
@@ -26,13 +27,20 @@ Milestones 1–4 are in place: capture, preview with trim, and export to MP4, We
 - After export: Copy (paste the file into Slack, Mail, Finder), Show in Finder, or drag the file out
 - Closing an unexported recording asks first; recordings left by a quit or crash are offered again at the next launch
 
-**Settings**
-- General: launch at login, save folder, file name pattern, editable global shortcuts (defaults ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop)
-- Recording: frame rate, cursor, Retina
-- Export: default format, MP4 codec/quality/size, WebM quality/size, GIF preset, loop and fit target
-- Acknowledgements (third-party licenses) under General
+**Screenshots**
+- Same overlays as recording; full Retina resolution; window shots keep transparent corners, shadow optional
+- After capture: a floating thumbnail (click to edit, drag out, saved if left alone), or open the editor, copy, or save
+- Editor: arrows (Shift snaps to 45°, bend from the middle handle), text with an optional background, pixelate, crop; select, move, resize, delete, undo/redo; six colors plus a picker; V / A / T / P / C switch tools
+- Export: ⌘C, ⌘S or drag out; PNG or JPEG at 2× or 1× with the pixel and file size shown; no metadata in the file
 
-Next (M5): countdown, click highlights, onboarding polish and release packaging.
+**Settings**
+- General: launch at login, save folder, file name pattern, daily update check, editable global shortcuts (defaults ⌃⌥⌘4 screenshot area, ⌃⌥⌘A area, ⌃⌥⌘W window, ⌃⌥⌘S screen, ⌃⌥⌘. stop)
+- Recording: frame rate, cursor, Retina, click highlights, countdown
+- Export: default format, MP4 codec/quality/size, WebM quality/size, GIF preset, loop and fit target
+- Screenshot: after capture, format, scale, window shadow, default annotation style
+- About: version, build date and commit, links, Report a Bug, Send Feedback, Copy Diagnostics, Acknowledgements
+
+Next: screenshot self-timer, shapes, highlighter and numbered badges; Homebrew cask and the App Store.
 
 ### How GIFs stay small
 
