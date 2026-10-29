@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tinycap — tiny screen recorder and screenshot tool for macOS</title>
-  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or an area and export MP4, WebM or GIF, or take a screenshot and mark it up with arrows, text, pixelation and a crop. Free, open source, and your files stay on your Mac.">
+  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or an area and export MP4, WebM or GIF, or take a screenshot and mark it up with arrows, shapes, highlights, numbered steps, text, pixelation and a crop. Free, open source, and your files stay on your Mac.">
   <meta name="color-scheme" content="light dark">
   <meta property="og:title" content="Tinycap — tiny screen recorder and screenshot tool for macOS">
-  <meta property="og:description" content="Record or screenshot a window, a screen or an area from the menu bar. Export MP4, WebM or GIF, or mark up a screenshot with arrows, text and pixelation. Free and open source.">
+  <meta property="og:description" content="Record or screenshot a window, a screen or an area from the menu bar. Export MP4, WebM or GIF, or mark up a screenshot with arrows, highlights, numbered steps and pixelation. Free and open source.">
   <meta property="og:image" content="https://soleo.github.io/tinycap/assets/icon-512.png">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=0.3.0-brew">
+  <link rel="stylesheet" href="styles.css?v=0.4.0">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -38,14 +38,14 @@
       <div class="hero-copy">
         <img class="hero-icon" src="assets/icon-256.png" width="128" height="128" alt="Tinycap app icon: a window inside dashed capture corners, with a pointer">
         <h1>Capture your screen.<br>Get a small file.</h1>
-        <p class="lead">Tinycap lives in your menu bar. Record a window, a screen or an area and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — or take a <strong>screenshot</strong> and mark it up with arrows, text and pixelation. Sized for pull requests, bug reports and chat.</p>
+        <p class="lead">Tinycap lives in your menu bar. Record a window, a screen or an area and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — or take a <strong>screenshot</strong> and mark it up with arrows, highlights, numbered steps and pixelation. Sized for pull requests, bug reports and chat.</p>
         <div class="cta">
-          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.3.0/Tinycap-0.3.0.dmg">
+          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.4.0/Tinycap-0.4.0.dmg">
             <span class="rec" aria-hidden="true"></span> Download for Mac
           </a>
           <a class="button" href="https://github.com/soleo/tinycap">View source</a>
         </div>
-        <p class="fine">Version 0.3.0 (<a href="https://github.com/soleo/tinycap/releases/tag/v0.3.0">what's new</a>) · 5.8 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
+        <p class="fine">Version 0.4.0 (<a href="https://github.com/soleo/tinycap/releases/tag/v0.4.0">what's new</a>) · 5.9 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
         <p class="fine brew">Or with Homebrew: <code>brew install --cask soleo/tap/tinycap</code></p>
       </div>
 
@@ -125,7 +125,7 @@
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">✦</span> Native and light</h3>
-          <p>Built with Swift, SwiftUI and ScreenCaptureKit. A 5.8 MB download that records straight to disk with hardware encoding.</p>
+          <p>Built with Swift, SwiftUI and ScreenCaptureKit. A 5.9 MB download that records straight to disk with hardware encoding.</p>
         </article>
       </div>
     </section>
@@ -133,7 +133,7 @@
     <section id="screenshots" class="section">
       <h2>Screenshots you can mark up</h2>
       <div class="split shots">
-        <figure class="markup" aria-label="Illustration: a screenshot with a curved pink arrow, a pink label, a pixelated API key and a crop">
+        <figure class="markup" aria-label="Illustration: a screenshot with a highlighted heading, numbered steps, a curved pink arrow, a pink label, a pixelated API key and a crop">
           <svg viewBox="0 0 560 360" role="img" aria-hidden="true">
             <defs>
               <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
@@ -181,9 +181,18 @@
               <path d="M218 232 Q 262 180 311 217" stroke-width="7"/>
               <polyline points="289,218 311,217 306,196" stroke-width="7"/>
             </g>
+            <!-- highlighter over the heading, see-through so it stays readable -->
+            <rect x="22" y="55" width="162" height="22" rx="11" fill="#ffcc00" fill-opacity=".4"/>
+            <!-- numbered steps -->
+            <g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="15" font-weight="800" text-anchor="middle">
+              <circle cx="182" cy="118" r="14" fill="#ff265e" stroke="#fff" stroke-width="2" filter="url(#soft)"/>
+              <text x="182" y="123.5" fill="#fff">1</text>
+              <circle cx="356" cy="118" r="14" fill="#ff265e" stroke="#fff" stroke-width="2" filter="url(#soft)"/>
+              <text x="356" y="123.5" fill="#fff">2</text>
+            </g>
             <text x="44" y="246" filter="url(#soft)" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="800" fill="#ff265e">Launch day</text>
           </svg>
-          <figcaption>A bent arrow, a label, the API key pixelated and a crop, ready for ⌘C.</figcaption>
+          <figcaption>A highlight, numbered steps, a bent arrow, a label, the API key pixelated and a crop, ready for ⌘C.</figcaption>
         </figure>
         <div>
           <p>Screenshot an area, a window or a screen from the same menu, or press <kbd>⌃⌥⌘4</kbd>. A thumbnail waits in the corner: click it to edit, drag it into any app, or leave it and it's saved.</p>
@@ -197,6 +206,14 @@
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">T</span> Text that reads</h3>
           <p>Bold labels in six colors or any you pick, with an optional solid background.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">▢</span> Shapes and highlights</h3>
+          <p>Outline a button with a rectangle or ellipse, sweep a see-through highlighter over a line, or draw freehand.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">①</span> Numbered steps</h3>
+          <p>Click to drop 1, 2, 3 for a walkthrough. Delete one and the rest renumber themselves.</p>
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">▦</span> Pixelate for real</h3>
@@ -252,8 +269,8 @@ open build/Tinycap.app</code></pre>
       <img src="assets/icon-256.png" width="96" height="96" alt="">
       <h2>Try Tinycap</h2>
       <p>Free. On first launch, macOS asks you to allow Screen Recording — Tinycap walks you through it. After that it checks for updates once a day and lets you know quietly.</p>
-      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.3.0/Tinycap-0.3.0.dmg">
-        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.3.0
+      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.4.0/Tinycap-0.4.0.dmg">
+        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.4.0
       </a>
       <p class="fine brew">Or with Homebrew: <code>brew install --cask soleo/tap/tinycap</code></p>
       <p class="fine"><a href="https://github.com/soleo/tinycap/releases">Changelog, all releases and checksums</a></p>

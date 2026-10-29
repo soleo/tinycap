@@ -196,7 +196,7 @@ h1 { font-size: clamp(36px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.
 
 .shots { align-items: center; }
 .shots p { font-size: 19px; margin: 0; }
-.shot-tiles { margin-top: 36px; }
+.shot-tiles { margin-top: 36px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .markup { margin: 0; }
 .markup svg {
   display: block; width: 100%; height: auto; border-radius: var(--radius);
