@@ -8,8 +8,10 @@
 #       `generate_keys -x <file>` and store it in 1Password.
 #
 #   scripts/make-appcast.sh <dmg> <version> <build-number> [notes.md]
-#       Signs the DMG with that key and writes appcast.xml next to it. Attach both to
-#       the GitHub release tagged v<version>; the app reads
+#       Signs the DMG with that key and writes appcast.xml next to it. make-dmg.sh passes
+#       Tinycap-<version>-update.dmg, a copy of the release DMG, so in-app updates are
+#       counted separately from new downloads. Attach both to the GitHub release
+#       tagged v<version>; the app reads
 #       https://github.com/soleo/tinycap/releases/latest/download/appcast.xml.
 #
 #       Release notes (default ReleaseNotes/<version>.md) are converted to HTML

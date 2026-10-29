@@ -6,6 +6,10 @@
 #   4. Gatekeeper check and SHA-256 (for the Homebrew cask)
 #   5. Sparkle appcast.xml signed with the EdDSA key (scripts/make-appcast.sh)
 #
+# The appcast points at Tinycap-<version>-update.dmg, a byte-for-byte copy of the DMG.
+# GitHub counts downloads per file, so the DMG count is new downloads and the update
+# copy's count is in-app updates (scripts/download-stats.sh prints both).
+#
 # Release:
 #   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 #   NOTARY_PROFILE=tinycap-notary \
@@ -28,7 +32,7 @@ UNSIGNED=0
 for arg in "$@"; do
   case "$arg" in
     --unsigned) UNSIGNED=1 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "error: unknown option $arg" >&2; exit 2 ;;
   esac
 done
@@ -129,13 +133,16 @@ echo "==> $DMG ($SIZE)"
 echo "    sha256 $SHA"
 if [[ "$UNSIGNED" == "0" ]]; then
   # --- 5. Appcast ------------------------------------------------------------------
+  # Same bytes (still notarized and stapled), separate name, so its downloads are counted apart.
+  UPDATE="$OUT/Tinycap-$VERSION-update.dmg"
+  cp "$DMG" "$UPDATE"
   step "Signing the update feed"
-  "$ROOT/scripts/make-appcast.sh" "$DMG" "$VERSION" "$BUILD_NUMBER"
+  "$ROOT/scripts/make-appcast.sh" "$UPDATE" "$VERSION" "$BUILD_NUMBER"
   echo
   echo "Publish (the appcast must be on the latest release for the in-app updater):"
   notes="$ROOT/ReleaseNotes/$VERSION.md"
   if [[ -s "$notes" ]]; then notes_flag="--notes-file '$notes'"; else notes_flag="--generate-notes"; fi
   # Tag the commit the DMG was built from, not whatever the default branch points to later.
   target="$(git -C "$ROOT" rev-parse HEAD)"
-  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --target $target --title 'Tinycap $VERSION' $notes_flag"
+  echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$UPDATE' '$OUT/appcast.xml' --target $target --title 'Tinycap $VERSION' $notes_flag"
 fi
