@@ -4,6 +4,16 @@ A small, native macOS menu-bar screen recorder and screenshot tool. Record a win
 
 Requires macOS 15 Sequoia or later. MIT licensed.
 
+## Install
+
+Download the DMG from the [latest release](https://github.com/soleo/tinycap/releases/latest), or use Homebrew:
+
+```sh
+brew install --cask soleo/tap/tinycap
+```
+
+Tinycap checks for updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`.
+
 ## Status
 
 Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotation editor, and daily update checks are in place.
@@ -40,7 +50,7 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 - Screenshot: after capture, format, scale, window shadow, default annotation style
 - About: version, build date and commit, links, Report a Bug, Send Feedback, Copy Diagnostics, Acknowledgements
 
-Next: screenshot self-timer, shapes, highlighter and numbered badges; Homebrew cask and the App Store.
+Next: screenshot self-timer, shapes, highlighter and numbered badges; the App Store.
 
 ### How GIFs stay small
 
@@ -103,6 +113,12 @@ scripts/make-dmg.sh --unsigned        # local test DMG, not notarized
 ```
 
 Write the user-facing notes in `ReleaseNotes/<version>.md` first. They are converted to HTML and embedded in the appcast, so the update window shows them, and the printed `gh release create` command uses the same file. Attach `appcast.xml` to every release: the app reads it from `releases/latest/download/appcast.xml`. The private signing key stays in the login keychain; back it up to 1Password, because without it existing installs can't verify future updates.
+
+After the release is published, update the Homebrew cask in [soleo/homebrew-tap](https://github.com/soleo/homebrew-tap). The script takes the checksum from the published release:
+
+```sh
+scripts/bump-cask.sh ../homebrew-tap   # sets version and sha256 in Casks/tinycap.rb
+```
 
 ### Updates
 
