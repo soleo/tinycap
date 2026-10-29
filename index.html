@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tinycap — tiny screen recorder for macOS</title>
-  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder. Record a window, a screen or an area, trim it, and export MP4, WebM or GIF. Free, open source, and nothing leaves your Mac.">
+  <title>Tinycap — tiny screen recorder and screenshot tool for macOS</title>
+  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or an area and export MP4, WebM or GIF, or take a screenshot and mark it up with arrows, text, pixelation and a crop. Free, open source, and your files stay on your Mac.">
   <meta name="color-scheme" content="light dark">
-  <meta property="og:title" content="Tinycap — tiny screen recorder for macOS">
-  <meta property="og:description" content="Record a window, a screen or an area from the menu bar. Trim, then export MP4, WebM or GIF. Free and open source.">
+  <meta property="og:title" content="Tinycap — tiny screen recorder and screenshot tool for macOS">
+  <meta property="og:description" content="Record or screenshot a window, a screen or an area from the menu bar. Export MP4, WebM or GIF, or mark up a screenshot with arrows, text and pixelation. Free and open source.">
   <meta property="og:image" content="https://soleo.github.io/tinycap/assets/icon-512.png">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
@@ -25,6 +25,7 @@
     </a>
     <nav aria-label="Primary">
       <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
       <a href="#how">How it works</a>
       <a href="#shortcuts">Shortcuts</a>
       <a href="https://github.com/soleo/tinycap">GitHub</a>
@@ -35,15 +36,15 @@
     <section class="hero">
       <div class="hero-copy">
         <img class="hero-icon" src="assets/icon-256.png" width="128" height="128" alt="Tinycap app icon: a window inside dashed capture corners, with a pointer">
-        <h1>Record your screen.<br>Get a small file.</h1>
-        <p class="lead">Tinycap lives in your menu bar. Pick a window, a screen or an area, record, trim, and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — sized for pull requests, bug reports and chat.</p>
+        <h1>Capture your screen.<br>Get a small file.</h1>
+        <p class="lead">Tinycap lives in your menu bar. Record a window, a screen or an area and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — or take a <strong>screenshot</strong> and mark it up with arrows, text and pixelation. Sized for pull requests, bug reports and chat.</p>
         <div class="cta">
-          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.1.0/Tinycap-0.1.0.dmg">
+          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.3.0/Tinycap-0.3.0.dmg">
             <span class="rec" aria-hidden="true"></span> Download for Mac
           </a>
           <a class="button" href="https://github.com/soleo/tinycap">View source</a>
         </div>
-        <p class="fine">Version 0.1.0 · 3.4 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Free and open source (MIT).</p>
+        <p class="fine">Version 0.3.0 · 5.8 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
       </div>
 
       <figure class="demo" aria-label="Illustration: Tinycap's menu-bar menu and an area being selected">
@@ -55,6 +56,10 @@
             <span class="clock">9:41</span>
           </div>
           <div class="menu">
+            <div class="menu-item">Screenshot Area <kbd>⌃⌥⌘4</kbd></div>
+            <div class="menu-item">Screenshot Window</div>
+            <div class="menu-item">Screenshot Screen</div>
+            <div class="menu-sep"></div>
             <div class="menu-item">Record Window <kbd>⌃⌥⌘W</kbd></div>
             <div class="menu-item">Record Screen <kbd>⌃⌥⌘S</kbd></div>
             <div class="menu-item active">Record Area <kbd>⌃⌥⌘A</kbd></div>
@@ -62,6 +67,10 @@
             <div class="menu-item">Open Recent <span class="chev">›</span></div>
             <div class="menu-sep"></div>
             <div class="menu-item">Settings… <kbd>⌘,</kbd></div>
+            <div class="menu-sep compact-hide"></div>
+            <div class="menu-item compact-hide">Report a Bug…</div>
+            <div class="menu-item compact-hide">Send Feedback…</div>
+            <div class="menu-sep"></div>
             <div class="menu-item">Quit Tinycap <kbd>⌘Q</kbd></div>
           </div>
           <div class="dim"></div>
@@ -86,7 +95,7 @@
       <div class="grid">
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">▣</span> Window, screen or area</h3>
-          <p>Hover to pick a window, click a display, or drag any rectangle with live W × H and resize handles. Window recordings follow the window when it moves.</p>
+          <p>Hover to pick a window, click a display, or drag any rectangle with live W × H and resize handles. Window recordings follow the window when it moves. Optional 3-2-1 countdown and click highlights.</p>
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">✂</span> Preview and trim</h3>
@@ -110,17 +119,96 @@
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">⌂</span> Stays on your Mac</h3>
-          <p>No accounts, no uploads, no telemetry. The app is sandboxed and has no network access at all; files go to your Movies folder.</p>
+          <p>No accounts, no uploads, no telemetry. The app is sandboxed; its only network request is a daily update check, which you can turn off. Files go to your Movies folder.</p>
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">✦</span> Native and light</h3>
-          <p>Built with Swift, SwiftUI and ScreenCaptureKit. The whole app is about 7 MB and records straight to disk with hardware encoding.</p>
+          <p>Built with Swift, SwiftUI and ScreenCaptureKit. A 5.8 MB download that records straight to disk with hardware encoding.</p>
         </article>
       </div>
     </section>
 
+    <section id="screenshots" class="section">
+      <h2>Screenshots you can mark up</h2>
+      <div class="split shots">
+        <figure class="markup" aria-label="Illustration: a screenshot with a curved pink arrow, a pink label, a pixelated API key and a crop">
+          <svg viewBox="0 0 560 360" role="img" aria-hidden="true">
+            <defs>
+              <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1" stdDeviation="2.2" flood-color="#000" flood-opacity=".28"/>
+              </filter>
+            </defs>
+            <!-- the captured window -->
+            <rect x="0" y="0" width="560" height="360" fill="#f4f3f8"/>
+            <rect x="0" y="0" width="560" height="34" fill="#e6e5ec"/>
+            <circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+            <rect x="28" y="58" width="150" height="16" rx="4" fill="#2a2a33"/>
+            <rect x="28" y="84" width="96" height="10" rx="3" fill="#b9b8c4"/>
+            <rect x="28" y="112" width="160" height="78" rx="10" fill="#fff"/>
+            <rect x="44" y="128" width="70" height="9" rx="3" fill="#b9b8c4"/>
+            <rect x="44" y="146" width="110" height="20" rx="4" fill="#2a2a33"/>
+            <rect x="202" y="112" width="160" height="78" rx="10" fill="#fff"/>
+            <rect x="218" y="128" width="70" height="9" rx="3" fill="#b9b8c4"/>
+            <rect x="218" y="146" width="90" height="20" rx="4" fill="#2a2a33"/>
+            <rect x="28" y="206" width="334" height="128" rx="10" fill="#fff"/>
+            <polyline points="44,312 84,290 120,300 160,262 200,276 240,238 280,250 318,222 346,232" fill="none" stroke="#5b4fd6" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="318" cy="222" r="5" fill="#fff" stroke="#5b4fd6" stroke-width="3"/>
+            <rect x="380" y="112" width="156" height="222" rx="10" fill="#fff"/>
+            <rect x="396" y="130" width="80" height="10" rx="3" fill="#2a2a33"/>
+            <rect x="396" y="152" width="120" height="8" rx="3" fill="#b9b8c4"/>
+            <rect x="396" y="168" width="100" height="8" rx="3" fill="#b9b8c4"/>
+            <text x="396" y="206" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#6b6a75">API key</text>
+            <!-- pixelated: the key, replaced by flat blocks -->
+            <g>
+              <rect x="396" y="214" width="12" height="12" fill="#c9c8d2"/><rect x="408" y="214" width="12" height="12" fill="#8f8e9a"/>
+              <rect x="420" y="214" width="12" height="12" fill="#b0afbb"/><rect x="432" y="214" width="12" height="12" fill="#7d7c88"/>
+              <rect x="444" y="214" width="12" height="12" fill="#c2c1cc"/><rect x="456" y="214" width="12" height="12" fill="#9796a2"/>
+              <rect x="468" y="214" width="12" height="12" fill="#b8b7c2"/><rect x="480" y="214" width="12" height="12" fill="#878693"/>
+              <rect x="492" y="214" width="12" height="12" fill="#a9a8b4"/><rect x="504" y="214" width="12" height="12" fill="#cfced8"/>
+            </g>
+            <rect x="396" y="244" width="110" height="8" rx="3" fill="#b9b8c4"/>
+            <rect x="396" y="260" width="84" height="8" rx="3" fill="#b9b8c4"/>
+            <!-- crop: everything outside is dimmed -->
+            <path d="M0 0H560V360H0Z M16 46V346H548V46Z" fill="#000" fill-opacity=".38" fill-rule="evenodd"/>
+            <rect x="16" y="46" width="532" height="300" fill="none" stroke="#fff" stroke-width="1.5"/>
+            <g fill="#fff" stroke="#1f3fd1" stroke-width="2">
+              <circle cx="16" cy="46" r="5"/><circle cx="548" cy="46" r="5"/><circle cx="16" cy="346" r="5"/><circle cx="548" cy="346" r="5"/>
+            </g>
+            <!-- annotations, in Tinycap's default pink -->
+            <g filter="url(#soft)" fill="none" stroke="#ff265e" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M218 232 Q 262 180 311 217" stroke-width="7"/>
+              <polyline points="289,218 311,217 306,196" stroke-width="7"/>
+            </g>
+            <text x="44" y="246" filter="url(#soft)" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="800" fill="#ff265e">Launch day</text>
+          </svg>
+          <figcaption>A bent arrow, a label, the API key pixelated and a crop, ready for ⌘C.</figcaption>
+        </figure>
+        <div>
+          <p>Screenshot an area, a window or a screen from the same menu, or press <kbd>⌃⌥⌘4</kbd>. A thumbnail waits in the corner: click it to edit, drag it into any app, or leave it and it's saved.</p>
+          <div class="grid two">
+            <article class="tile">
+              <h3><span class="glyph" aria-hidden="true">↷</span> Arrows that bend</h3>
+              <p>Drag to draw, hold Shift to snap to 45°, and pull the middle handle to curve it.</p>
+            </article>
+            <article class="tile">
+              <h3><span class="glyph" aria-hidden="true">T</span> Text that reads</h3>
+              <p>Bold labels in six colors or any you pick, with an optional solid background.</p>
+            </article>
+            <article class="tile">
+              <h3><span class="glyph" aria-hidden="true">▦</span> Pixelate for real</h3>
+              <p>Hide keys and names. The export replaces those pixels, so nothing can be recovered from the file.</p>
+            </article>
+            <article class="tile">
+              <h3><span class="glyph" aria-hidden="true">⌗</span> Crop and copy</h3>
+              <p>Crop to what matters, then ⌘C, ⌘S or drag out. PNG or JPEG at 2× or 1×, with no location or device data.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="how" class="section">
-      <h2>How it works</h2>
+      <h2>How recording works</h2>
       <ol class="steps">
         <li><span class="n">1</span><div><h3>Choose</h3><p>Click the menu-bar icon, or press a shortcut, and pick Window, Screen or Area.</p></div></li>
         <li><span class="n">2</span><div><h3>Record</h3><p>The icon turns into a timer. Click it, or press ⌃⌥⌘. to stop.</p></div></li>
@@ -132,11 +220,12 @@
     <section id="shortcuts" class="section split">
       <div>
         <h2>Shortcuts</h2>
-        <p>Global shortcuts work from any app, so the menu never shows up in your recording. Change them in Settings.</p>
+        <p>Global shortcuts work from any app, so the menu never shows up in your recording or screenshot. Change them in Settings.</p>
       </div>
       <table class="keys">
         <caption class="visually-hidden">Default global shortcuts</caption>
         <tbody>
+          <tr><th scope="row">Screenshot Area</th><td><kbd>⌃⌥⌘4</kbd></td></tr>
           <tr><th scope="row">Record Area</th><td><kbd>⌃⌥⌘A</kbd></td></tr>
           <tr><th scope="row">Record Window</th><td><kbd>⌃⌥⌘W</kbd></td></tr>
           <tr><th scope="row">Record Screen</th><td><kbd>⌃⌥⌘S</kbd></td></tr>
@@ -148,7 +237,7 @@
     <section class="section split">
       <div>
         <h2>Open source</h2>
-        <p>Tinycap is MIT licensed. WebM export uses libvpx and libwebm from the WebM Project, built from pinned source. Issues and pull requests are welcome.</p>
+        <p>Tinycap is MIT licensed. WebM export uses libvpx and libwebm from the WebM Project, built from pinned source, and the direct download updates itself with Sparkle. Found a bug? Report a Bug in the menu opens an issue with your versions filled in. Pull requests are welcome.</p>
         <p><a href="https://github.com/soleo/tinycap">github.com/soleo/tinycap</a> · <a href="https://github.com/soleo/tinycap/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a></p>
       </div>
       <pre class="code" aria-label="Build from source"><code>git clone https://github.com/soleo/tinycap
@@ -160,9 +249,9 @@ open build/Tinycap.app</code></pre>
     <section class="section final">
       <img src="assets/icon-256.png" width="96" height="96" alt="">
       <h2>Try Tinycap</h2>
-      <p>Free. On first launch, macOS asks you to allow Screen Recording — Tinycap walks you through it.</p>
-      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.1.0/Tinycap-0.1.0.dmg">
-        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.1.0
+      <p>Free. On first launch, macOS asks you to allow Screen Recording — Tinycap walks you through it. After that it checks for updates once a day and lets you know quietly.</p>
+      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.3.0/Tinycap-0.3.0.dmg">
+        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.3.0
       </a>
       <p class="fine"><a href="https://github.com/soleo/tinycap/releases">All releases and checksums</a></p>
     </section>
