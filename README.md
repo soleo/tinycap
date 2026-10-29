@@ -90,46 +90,77 @@ SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" scripts/build-app.sh
 
 Other variables: `BUNDLE_ID` (default `app.tinycap.Tinycap`), `VERSION`, `BUILD_NUMBER`, `ARCHS`.
 
-### Release DMG
+### Releasing
 
-`scripts/make-dmg.sh` builds the direct-download DMG. It does five things:
+`scripts/make-dmg.sh` builds the direct-download release. It:
 
 - builds the universal app, signed with Developer ID and the hardened runtime
 - packages it with an Applications shortcut, then signs, notarizes and staples the DMG
-- checks the DMG with Gatekeeper
-- prints its SHA-256 for the Homebrew cask
-- writes `appcast.xml` for the in-app updater, signed with the Sparkle EdDSA key
+- checks the DMG with Gatekeeper and writes its SHA-256 next to it
+- copies the DMG to `Tinycap-<version>-update.dmg` and writes `appcast.xml` pointing at the copy, signed with the Sparkle EdDSA key. The copy is byte-identical; its separate name lets GitHub count in-app updates apart from new downloads.
+- prints the `gh release create` command to publish it all
+
+**One-time setup** on the release Mac:
 
 ```sh
-# once: store notarization credentials in the login keychain
+# Developer ID Application certificate in the login keychain (Xcode → Settings → Accounts)
+brew install nasm   # release builds require it, so the Intel slice of libvpx gets SIMD
+
+# notarization credentials, stored in the login keychain
 xcrun notarytool store-credentials tinycap-notary --apple-id you@example.com --team-id TEAMID
-# once: create the update-signing key in the keychain; commit Resources/sparkle-public-key.txt
+
+# update-signing key: created in the keychain, public half written to Resources/sparkle-public-key.txt (commit it)
 scripts/make-appcast.sh --setup-key
-
-SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=tinycap-notary \
-  scripts/make-dmg.sh                 # → build/release/Tinycap-<version>.dmg (+ .sha256)
-
-scripts/make-dmg.sh --unsigned        # local test DMG, not notarized
+# back up the private key to 1Password, then delete the file
+build/vendor/Sparkle/bin/generate_keys -x sparkle-private-key.txt
 ```
 
-Write the user-facing notes in `ReleaseNotes/<version>.md` first. They are converted to HTML and embedded in the appcast, so the update window shows them, and the printed `gh release create` command uses the same file. Attach `appcast.xml` to every release: the app reads it from `releases/latest/download/appcast.xml`. The private signing key stays in the login keychain; back it up to 1Password, because without it existing installs can't verify future updates.
+Without the Sparkle private key, existing installs can't verify future updates, so keep the backup.
 
-After the release is published, update the Homebrew cask in [soleo/homebrew-tap](https://github.com/soleo/homebrew-tap). The script takes the checksum from the published release:
+**Each release:**
 
-```sh
-scripts/bump-cask.sh ../homebrew-tap   # sets version and sha256 in Casks/tinycap.rb
-```
+1. On a branch, bump `VERSION` (for example `0.4.0`) and write `ReleaseNotes/<version>.md` for users. The notes are converted to HTML for the update window and reused as the GitHub release notes. Open a PR and merge it.
+2. On an up-to-date, clean `main`, build, notarize and sign the feed (a few minutes):
 
-### Updates
+   ```sh
+   git switch main && git pull
+   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=tinycap-notary \
+     scripts/make-dmg.sh
+   ```
 
-The direct build embeds [Sparkle](https://sparkle-project.org) 2.10.0 (`scripts/fetch-sparkle.sh`, pinned by SHA-256) and checks the appcast once a day. The App Store build (`CHANNEL=appstore scripts/build-app.sh`) has no Sparkle; it asks Apple's lookup API for the store version once a day and sends people to the App Store page. Both show a dot on the menu-bar icon, an "Update to Tinycap X.Y…" menu item and one quiet notification per version, and nothing appears while you select, record or export. A direct build made without `Resources/sparkle-public-key.txt` has no updater.
+   Output goes to `build/release/`. The build number is the commit count, so build from the merged commit.
+3. Run the `gh release create` command the script printed. It tags the commit the DMG was built from and attaches the DMG, its `.sha256`, the update copy and `appcast.xml`. The appcast must be on the latest release: the app reads `releases/latest/download/appcast.xml`.
+4. Check that the feed serves the new version:
 
-The version comes from the `VERSION` file (or `VERSION=1.2.3`); bump it before tagging a release. The build number is the commit count, for local builds too. Release builds require `nasm`, so the Intel slice gets SIMD.
+   ```sh
+   curl -sL https://github.com/soleo/tinycap/releases/latest/download/appcast.xml | grep shortVersionString
+   ```
+
+5. Update the Homebrew cask in [soleo/homebrew-tap](https://github.com/soleo/homebrew-tap). The script takes the checksum from the published release:
+
+   ```sh
+   scripts/bump-cask.sh ../homebrew-tap   # sets version and sha256 in Casks/tinycap.rb
+   brew audit --cask --online soleo/tap/tinycap
+   git -C ../homebrew-tap commit -am "tinycap <version>" && git -C ../homebrew-tap push
+   ```
+
+   (On Homebrew 7, run `brew trust --cask soleo/tap/tinycap` once before auditing.)
+6. Update the landing page on the `gh-pages` branch (`git worktree add ../tinycap-web gh-pages`): the two download links, the version and the DMG size. Search `index.html` for the old version number.
+
+`scripts/download-stats.sh` prints downloads, in-app updates and update checks per release.
+
+**Test DMG:** `scripts/make-dmg.sh --unsigned` makes an ad-hoc signed, un-notarized DMG for local testing. Gatekeeper will warn on other Macs, and it has no appcast.
 
 Two known, harmless messages appear during the release build:
 
 - `ld: warning: no platform load command found in '…libvpx.a[x86_64](….asm.o)'`: nasm doesn't tag its object files with a macOS version, and the linker correctly assumes macOS.
 - `hdiutil: WARNING: … is deprecated`: `hdiutil create` still works; the script will move to `diskutil image` once it's verified on a release machine.
+
+### Updates
+
+The direct build embeds [Sparkle](https://sparkle-project.org) 2.10.0 (`scripts/fetch-sparkle.sh`, pinned by SHA-256) and checks the appcast once a day. The App Store build (`CHANNEL=appstore scripts/build-app.sh`) has no Sparkle; it asks Apple's lookup API for the store version once a day and sends people to the App Store page. Both show a dot on the menu-bar icon, an "Update to Tinycap X.Y…" menu item and one quiet notification per version, and nothing appears while you select, record or export. A direct build made without `Resources/sparkle-public-key.txt` has no updater.
+
+The version comes from the `VERSION` file (or `VERSION=1.2.3`). The build number is the commit count, for local builds too.
 
 ### App icon
 
