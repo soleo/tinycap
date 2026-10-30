@@ -17,6 +17,7 @@ final class AudioSettingsTests: XCTestCase {
         XCTAssertFalse(s.recordsMicrophone)
         XCTAssertNil(s.microphoneID)
         XCTAssertEqual(s.audioSources, [])
+        XCTAssertTrue(s.reducesEcho, "speaker echo is removed unless turned off")
     }
 
     func testMP4MixesSoundByDefault() {

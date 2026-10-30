@@ -21,6 +21,8 @@ public enum PreferenceKey {
     public static let recordsMicrophone = "recording.microphone"
     /// Unique ID of the chosen input device; empty or missing means the system input.
     public static let microphoneID = "recording.microphoneID"
+    /// Record the microphone with macOS voice processing, which removes speaker echo.
+    public static let reducesEcho = "recording.reducesEcho"
     public static let lastError = "diagnostics.lastError"
     public static let filenamePattern = "export.filenamePattern"
     public static let saveFolderBookmark = "export.saveFolderBookmark"
@@ -50,6 +52,7 @@ public enum PreferenceKey {
             countdown: false,
             recordsSystemAudio: false,
             recordsMicrophone: false,
+            reducesEcho: true,
             filenamePattern: FilenamePattern.defaultPattern,
             exportCodec: VideoCodec.h264.rawValue,
             exportQuality: ExportSettings.defaultQuality,
@@ -77,6 +80,8 @@ public struct RecordingSettings: Sendable, Equatable {
     public var recordsMicrophone: Bool
     /// Input device to record from; nil means the system input.
     public var microphoneID: String?
+    /// Remove speaker sound from the microphone (voice processing). On by default.
+    public var reducesEcho: Bool
 
     public init(
         frameRate: FrameRate = .default,
@@ -86,7 +91,8 @@ public struct RecordingSettings: Sendable, Equatable {
         countdown: Bool = false,
         recordsSystemAudio: Bool = false,
         recordsMicrophone: Bool = false,
-        microphoneID: String? = nil
+        microphoneID: String? = nil,
+        reducesEcho: Bool = true
     ) {
         self.frameRate = frameRate
         self.showsCursor = showsCursor
@@ -96,6 +102,7 @@ public struct RecordingSettings: Sendable, Equatable {
         self.recordsSystemAudio = recordsSystemAudio
         self.recordsMicrophone = recordsMicrophone
         self.microphoneID = microphoneID
+        self.reducesEcho = reducesEcho
     }
 
     /// The sound sources this recording captures, in track order.
@@ -112,7 +119,8 @@ public struct RecordingSettings: Sendable, Equatable {
             countdown: defaults.bool(forKey: PreferenceKey.countdown),
             recordsSystemAudio: defaults.bool(forKey: PreferenceKey.recordsSystemAudio),
             recordsMicrophone: defaults.bool(forKey: PreferenceKey.recordsMicrophone),
-            microphoneID: defaults.string(forKey: PreferenceKey.microphoneID).flatMap { $0.isEmpty ? nil : $0 }
+            microphoneID: defaults.string(forKey: PreferenceKey.microphoneID).flatMap { $0.isEmpty ? nil : $0 },
+            reducesEcho: defaults.object(forKey: PreferenceKey.reducesEcho) as? Bool ?? true
         )
     }
 }

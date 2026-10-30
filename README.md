@@ -25,7 +25,7 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 - Screen mode: picks the display straight away, or lets you click one when there are several
 - ScreenCaptureKit (`SCRecordingOutput`) writes an H.264 master (with sound, Tinycap writes it itself from the video stream and a separate audio stream); 15/30/60 fps, Retina or 1×, cursor on/off
 - Optional 3-2-1 countdown and click highlights (yellow rings) in every recording mode
-- Optional sound: system audio (everything the Mac plays, in every mode) and the microphone, from the input device you pick in the menu, the area bar or Settings. They're recorded as separate tracks; Microphone permission is asked the first time you turn the mic on
+- Optional sound: system audio (everything the Mac plays, in every mode) and the microphone, from the input device you pick in the menu, the area bar or Settings. They're recorded as separate tracks; Microphone permission is asked the first time you turn the mic on. The mic goes through macOS voice processing by default, so speaker sound doesn't echo in it (Settings → Recording → Reduce echo from speakers)
 - While recording, the menu-bar icon shows the elapsed time; click it to stop
 
 **Preview and export**

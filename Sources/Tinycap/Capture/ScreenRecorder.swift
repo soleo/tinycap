@@ -47,6 +47,7 @@ final class ScreenRecorder: NSObject {
     /// Recordings with sound: the audio-only stream and the writer for both streams.
     private var audioStream: SCStream?
     private var fileWriter: CaptureFileWriter?
+    private var echoCancelledMic: EchoCancelledMicrophone?
     private let discardingOutput = DiscardingStreamOutput()
     private var outputURL: URL?
     private var finishContinuation: CheckedContinuation<Void, Error>?
@@ -158,30 +159,38 @@ final class ScreenRecorder: NSObject {
         audioConfig.excludesCurrentProcessAudio = true
         audioConfig.sampleRate = AudioSource.sampleRate
         audioConfig.channelCount = AudioSource.system.channelCount
-        audioConfig.captureMicrophone = sources.contains(.microphone)
+        // With echo reduction the mic comes from voice processing instead (see below).
+        let micFromStream = sources.contains(.microphone) && !settings.reducesEcho
+        audioConfig.captureMicrophone = micFromStream
         audioConfig.microphoneCaptureDeviceID = settings.microphoneID
         let audioStream = SCStream(filter: audioFilter, configuration: audioConfig, delegate: self)
         try audioStream.addStreamOutput(discardingOutput, type: .screen, sampleHandlerQueue: writer.queue)
         if sources.contains(.system) {
             try audioStream.addStreamOutput(writer, type: .audio, sampleHandlerQueue: writer.queue)
         }
-        if sources.contains(.microphone) {
+        if micFromStream {
             try audioStream.addStreamOutput(writer, type: .microphone, sampleHandlerQueue: writer.queue)
         }
+        let echoCancelledMic = sources.contains(.microphone) && settings.reducesEcho
+            ? EchoCancelledMicrophone { [weak writer] sample in writer?.appendMicrophone(sample) }
+            : nil
 
         Logger(subsystem: "app.tinycap.Tinycap", category: "recording").notice(
-            "stream start with sound: \(sources.map(\.rawValue), privacy: .public), mic \(settings.microphoneID ?? "default", privacy: .public)")
+            "stream start with sound: \(sources.map(\.rawValue), privacy: .public), mic \(settings.microphoneID ?? "default", privacy: .public), echo reduction \(echoCancelledMic != nil, privacy: .public)")
         self.stream = stream
         self.audioStream = audioStream
         self.configuration = config
         self.fileWriter = writer
+        self.echoCancelledMic = echoCancelledMic
         self.outputURL = outputURL
         isStopping = false
         do {
             // Sound first, so the first video frame already has sound to go with it.
+            try echoCancelledMic?.start(deviceID: settings.microphoneID)
             try await audioStream.startCapture()
             try await stream.startCapture()
         } catch {
+            echoCancelledMic?.stop()
             try? await audioStream.stopCapture()
             writer.cancel()
             reset()
@@ -206,6 +215,7 @@ final class ScreenRecorder: NSObject {
         if let fileWriter {
             try? await stream.stopCapture()
             try? await audioStream?.stopCapture()
+            echoCancelledMic?.stop()
             do {
                 try await fileWriter.finish()
             } catch {
@@ -249,6 +259,7 @@ final class ScreenRecorder: NSObject {
         recordingOutput = nil
         audioStream = nil
         fileWriter = nil
+        echoCancelledMic = nil
         outputURL = nil
         isStopping = false
     }

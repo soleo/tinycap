@@ -114,6 +114,16 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
         lastTime = max(lastTime, end.isValid ? end : time)
     }
 
+    /// Microphone samples from `EchoCancelledMicrophone`, timed on the same host clock.
+    func appendMicrophone(_ sample: CMSampleBuffer) {
+        // Made on the audio thread and never touched there again, so it can move queues.
+        let handoff = SampleHandoff(sample: sample)
+        queue.async { [self] in
+            guard !isFinishing, writer.status == .writing, handoff.sample.isValid else { return }
+            appendAudio(handoff.sample, to: audio[.microphone])
+        }
+    }
+
     // MARK: - Finish
 
     /// Closes the file after the streams have stopped. The last video frame is held
@@ -149,6 +159,10 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
             if writer.status == .writing { writer.cancelWriting() }
         }
     }
+}
+
+private struct SampleHandoff: @unchecked Sendable {
+    let sample: CMSampleBuffer
 }
 
 /// Receives the audio stream's screen frames, which nothing uses. Without an output for

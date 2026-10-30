@@ -184,6 +184,7 @@ private struct RecordingSettingsView: View {
     @AppStorage(PreferenceKey.recordsSystemAudio) private var recordsSystemAudio = false
     @AppStorage(PreferenceKey.recordsMicrophone) private var recordsMicrophone = false
     @AppStorage(PreferenceKey.microphoneID) private var microphoneID = ""
+    @AppStorage(PreferenceKey.reducesEcho) private var reducesEcho = true
     @State private var microphones: [MicrophoneDevice] = []
 
     var body: some View {
@@ -204,7 +205,10 @@ private struct RecordingSettingsView: View {
                     }
                 }
                 .disabled(!recordsMicrophone)
-                Text("Sound is kept only in MP4 exports, mixed into one track unless you choose separate tracks when exporting. Wear headphones to keep speaker sound out of the microphone.")
+                Toggle("Reduce echo from speakers", isOn: $reducesEcho)
+                    .disabled(!recordsMicrophone)
+                    .help("Removes the Mac's own sound from the microphone, as FaceTime does. Also evens out the voice level and lowers background noise. Turn it off for a studio microphone or when you wear headphones.")
+                Text("Sound is kept only in MP4 exports, mixed into one track unless you choose separate tracks when exporting. Echo reduction keeps speaker sound out of the microphone; turn it off for a studio microphone or headphones.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
