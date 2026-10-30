@@ -90,6 +90,8 @@ h1 { font-size: clamp(36px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.
 .lead { font-size: 20px; color: var(--ink-soft); margin: 0 0 26px; max-width: 34em; }
 .lead strong { color: var(--ink); }
 .cta { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.ph-badge { display: inline-block; margin-bottom: 18px; }
+.ph-badge img { display: block; }
 .fine { font-size: 14px; color: var(--ink-soft); margin: 0; }
 .fine.brew { margin-top: 10px; }
 .fine code {
