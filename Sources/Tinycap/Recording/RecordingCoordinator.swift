@@ -61,7 +61,11 @@ final class RecordingCoordinator {
                     state = .idle
                     return
                 }
-                let settings = RecordingSettings(defaults: .standard)
+                // Read after selection: the area bar can change these.
+                guard let settings = await prepareAudio(RecordingSettings(defaults: .standard)) else {
+                    state = .idle
+                    return
+                }
                 if settings.countdown, let rect = selection.countdownRect {
                     let countdown = CountdownController()
                     self.countdown = countdown
@@ -125,6 +129,7 @@ final class RecordingCoordinator {
                 settings: settings,
                 excludingApp: ownApp,
                 includingOwnWindows: ownWindows,
+                audioDisplay: Self.display(for: target, in: content),
                 outputURL: master
             )
         } catch {
@@ -141,6 +146,59 @@ final class RecordingCoordinator {
             trackWindow(window.windowID, on: display.frame)
         }
         state = .recording(startedAt: Date())
+    }
+
+    /// Checks the microphone before recording (AU-2, AU-4). Returns the settings to record
+    /// with, or nil if the user cancelled.
+    private func prepareAudio(_ settings: RecordingSettings) async -> RecordingSettings? {
+        var settings = settings
+        guard settings.recordsMicrophone else { return settings }
+
+        // Normally asked when the microphone was turned on; this catches a refusal since.
+        if !(await Microphones.requestAccess()) {
+            let alert = NSAlert()
+            alert.messageText = "Tinycap can't use the microphone"
+            alert.informativeText = "Allow Tinycap in System Settings → Privacy & Security → Microphone, or record without the microphone."
+            alert.addButton(withTitle: "Record Without Microphone")
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate()
+            switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                settings.recordsMicrophone = false
+                return settings
+            case .alertSecondButtonReturn:
+                Microphones.openSettings()
+                return nil
+            default:
+                return nil
+            }
+        }
+
+        if case .missing(let savedID) = MicrophoneChoice.resolve(savedID: settings.microphoneID, available: Microphones.available()) {
+            log.notice("microphone \(savedID, privacy: .public) not connected; using the system input")
+            settings.microphoneID = nil
+            let alert = NSAlert()
+            alert.messageText = "Your chosen microphone isn't connected"
+            alert.informativeText = "Tinycap will record from \(Microphones.systemDefaultName ?? "the system input") instead. You can pick another microphone in Settings → Recording."
+            alert.addButton(withTitle: "Record")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate()
+            guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        }
+        return settings
+    }
+
+    /// The display a recording is on, for the audio stream's filter. Sound isn't limited
+    /// to it; the filter just has to name one.
+    private static func display(for target: CaptureTarget, in content: SCShareableContent) -> SCDisplay? {
+        switch target {
+        case .display(let d), .area(let d, _), .windowRegion(_, let d, _):
+            return d
+        case .window(let window):
+            let index = Geometry.bestDisplayIndex(for: window.frame, displays: content.displays.map(\.frame))
+            return index.map { content.displays[$0] } ?? content.displays.first
+        }
     }
 
     /// Shows the click overlay on the recorded screen and returns its window for the
