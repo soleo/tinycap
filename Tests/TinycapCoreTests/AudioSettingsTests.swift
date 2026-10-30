@@ -19,6 +19,11 @@ final class AudioSettingsTests: XCTestCase {
         XCTAssertEqual(s.audioSources, [])
     }
 
+    func testMP4MixesSoundByDefault() {
+        // Browsers play only an MP4's first sound track, so one mixed track is the default.
+        XCTAssertFalse(defaults().bool(forKey: PreferenceKey.separateAudioTracks))
+    }
+
     func testReadsAudioSettings() {
         let d = defaults()
         d.set(true, forKey: PreferenceKey.recordsSystemAudio)

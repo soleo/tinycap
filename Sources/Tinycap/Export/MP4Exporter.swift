@@ -5,7 +5,8 @@ import VideoToolbox
 
 /// MP4 export (EX-1, EX-6): decodes the master with AVAssetReader and re-encodes with
 /// AVAssetWriter (hardware H.264/HEVC via VideoToolbox), applying trim, bitrate and scale.
-/// Kept sound tracks are copied as they are, each still its own track (AU-3, AU-6).
+/// Kept sound is mixed into one AAC track, which every player plays; with
+/// `separateAudioTracks` each source is copied as it is, still its own track (AU-3, AU-6).
 struct MP4Exporter: Exporter {
     let fileExtension = "mp4"
     static let keyframeSeconds = 2.0
@@ -69,8 +70,13 @@ struct MP4Exporter: Exporter {
         writer.add(input)
 
         var lanes = [EncodePipe.Lane(output: output, input: input, reportsProgress: true)]
-        for track in try await asset.loadTracks(withMediaType: .audio) where options.audioTrackIDs.contains(track.trackID) {
-            lanes.append(try await Self.soundLane(for: track, reader: reader, writer: writer))
+        let sound = try await asset.loadTracks(withMediaType: .audio).filter { options.audioTrackIDs.contains($0.trackID) }
+        if sound.count > 1, !options.separateAudioTracks {
+            lanes.append(try Self.mixedSoundLane(for: sound, reader: reader, writer: writer))
+        } else {
+            for track in sound {
+                lanes.append(try await Self.soundLane(for: track, reader: reader, writer: writer))
+            }
         }
 
         let pipe = EncodePipe(reader: reader, lanes: lanes, writer: writer, range: range, progress: progress)
@@ -99,6 +105,33 @@ extension MP4Exporter {
         writer.add(input)
         return EncodePipe.Lane(output: output, input: input, reportsProgress: false)
     }
+
+    /// Several sound tracks mixed into one stereo AAC track.
+    fileprivate static func mixedSoundLane(for tracks: [AVAssetTrack], reader: AVAssetReader, writer: AVAssetWriter) throws -> EncodePipe.Lane {
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: AudioSource.sampleRate,
+            AVNumberOfChannelsKey: 2,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        output.alwaysCopiesSampleData = false
+        guard reader.canAdd(output) else { throw ExportError.cannotEncode("can't mix the recording's sound") }
+        reader.add(output)
+
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: AudioSource.sampleRate,
+            AVNumberOfChannelsKey: 2,
+            AVEncoderBitRateKey: AudioSource.system.bitrate,
+        ])
+        input.expectsMediaDataInRealTime = false
+        guard writer.canAdd(input) else { throw ExportError.cannotEncode("can't write the recording's sound") }
+        writer.add(input)
+        return EncodePipe.Lane(output: output, input: input, reportsProgress: false)
+    }
 }
 
 /// Moves samples from reader to writer, one background queue per track so the reader
@@ -106,7 +139,7 @@ extension MP4Exporter {
 /// before/after they run), so this is safe to share.
 private final class EncodePipe: @unchecked Sendable {
     struct Lane {
-        let output: AVAssetReaderTrackOutput
+        let output: AVAssetReaderOutput
         let input: AVAssetWriterInput
         /// The video lane drives the progress bar.
         let reportsProgress: Bool

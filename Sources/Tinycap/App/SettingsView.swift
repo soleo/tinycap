@@ -204,7 +204,7 @@ private struct RecordingSettingsView: View {
                     }
                 }
                 .disabled(!recordsMicrophone)
-                Text("Sound is kept only in MP4 exports, with system audio and the microphone on separate tracks. Wear headphones to keep speaker sound out of the microphone.")
+                Text("Sound is kept only in MP4 exports, mixed into one track unless you choose separate tracks when exporting. Wear headphones to keep speaker sound out of the microphone.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -31,6 +31,9 @@ struct ExportOptions: Sendable {
     var format: FormatSettings
     /// Sound tracks of the master to keep. Only MP4 carries sound; WebM and GIF ignore it.
     var audioTrackIDs: [CMPersistentTrackID] = []
+    /// Keep each sound source as its own track instead of mixing them into one. Browsers
+    /// (Chrome, Slack, GitHub) play only the first track, so mixing is the default.
+    var separateAudioTracks = false
 }
 
 /// Turns the master .mov into a shareable file. One type per format.

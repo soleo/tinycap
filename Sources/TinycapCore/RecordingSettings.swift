@@ -38,6 +38,8 @@ public enum PreferenceKey {
     public static let gifFitTargetMB = "gif.fitTargetMB"
     public static let webmQuality = "webm.quality"
     public static let webmScale = "webm.scale"
+    /// MP4 keeps system audio and the microphone as separate tracks instead of one mix.
+    public static let separateAudioTracks = "export.separateAudioTracks"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [
@@ -54,6 +56,7 @@ public enum PreferenceKey {
             exportScale: OutputScale.full.storageValue,
             exportFormat: ExportFormat.mp4.rawValue,
             gifFitTargetMB: 10,
+            separateAudioTracks: false,
         ])
     }
 }

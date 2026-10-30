@@ -32,7 +32,7 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 - On stop, a preview window plays the clip
 - Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
 - MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
-- Sound plays in the preview, with a switch per source; MP4 keeps the sources that are on, each as its own AAC track. WebM and GIF are video only
+- Sound plays in the preview, with a switch per source; MP4 mixes the sources that are on into one AAC track, or keeps them as separate tracks for video editors (browsers play only the first). WebM and GIF are video only
 - WebM (VP9) with a quality slider and size; keeps the recording's real frame timing, tagged BT.709 so browsers show the right colors
 - GIF with presets (Small, Balanced, High), frame rate 5–30, size, 32–256 colors, ordered dithering, loop, duplicate-frame dropping, and "Fit under N MB"
 - File-size estimate from a short sample encode, for MP4 and GIF

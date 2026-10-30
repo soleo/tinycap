@@ -216,20 +216,29 @@ struct ExportCheck {
                   "master sound tracks \(soundInfo.audioTracks.map(\.source.rawValue))")
             let mp4 = FormatSettings.mp4(ExportSettings(scale: .full))
             let soundRange = CMTimeRange(start: CMTime(seconds: 2, preferredTimescale: 600), end: CMTime(seconds: 8, preferredTimescale: 600))
-            let soundCases: [(name: String, keep: [AudioSource])] = [
-                ("mp4-both-sources", [.system, .microphone]),
-                ("mp4-mic-only", [.microphone]),
-                ("mp4-no-sound", []),
+            // expected: the sources' tracks when copied; nil for one mixed (unnamed) track.
+            let soundCases: [(name: String, keep: [AudioSource], separate: Bool, expected: [AudioSource]?)] = [
+                ("mp4-both-mixed", [.system, .microphone], false, nil),
+                ("mp4-both-separate", [.system, .microphone], true, [.system, .microphone]),
+                ("mp4-mic-only", [.microphone], false, [.microphone]),
+                ("mp4-no-sound", [], false, []),
             ]
             for c in soundCases {
                 let out = dir.appendingPathComponent(c.name).appendingPathExtension("mp4")
                 let ids = soundInfo.audioTracks.filter { c.keep.contains($0.source) }.map(\.trackID)
                 try await MP4Exporter().export(master: soundMaster,
-                                               options: ExportOptions(timeRange: soundRange, format: mp4, audioTrackIDs: ids),
+                                               options: ExportOptions(timeRange: soundRange, format: mp4, audioTrackIDs: ids,
+                                                                      separateAudioTracks: c.separate),
                                                to: out) { _ in }
                 let asset = AVURLAsset(url: out)
                 let tracks = try await MasterInfo.audioTracks(of: asset)
-                check(tracks.map(\.source) == c.keep, "\(c.name): sound tracks \(tracks.map(\.source.rawValue))")
+                if let expected = c.expected {
+                    check(tracks.map(\.source) == expected, "\(c.name): sound tracks \(tracks.map(\.source.rawValue))")
+                } else {
+                    let channels = try await asset.loadTracks(withMediaType: .audio).first?.load(.formatDescriptions).first
+                        .flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame }
+                    check(tracks.count == 1 && channels == 2, "\(c.name): one stereo track (\(tracks.count) tracks, \(channels ?? 0) channels)")
+                }
                 for track in try await asset.loadTracks(withMediaType: .audio) {
                     let range = try await track.load(.timeRange)
                     check(abs(range.duration.seconds - 6) < 0.15,
