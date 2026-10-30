@@ -31,6 +31,8 @@
 	<string>15.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tinycap records your microphone into your recordings when you turn the microphone on. The sound stays on your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License. Tinycap contributors.</string>
 	<key>TinycapRepositoryURL</key>

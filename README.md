@@ -20,17 +20,19 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 
 **Capture**
 - Menu-bar app with no Dock icon: Screenshot Area / Window / Screen, Record Window / Screen / Area, Open Recent, Settings, Report a Bug, Send Feedback, Quit. Opening the app again while it runs shows a small window with the record buttons.
-- Area mode: dimmed overlay on every display, drag a rectangle, live W × H in points, move/resize handles, Return to record, Esc to cancel, floating bar with frame rate and cursor toggles
+- Area mode: dimmed overlay on every display, drag a rectangle, live W × H in points, move/resize handles, Return to record, Esc to cancel, floating bar with frame rate, cursor, system audio and microphone
 - Window mode: hover highlights the window under the cursor, click to record; keeps recording when the window moves
 - Screen mode: picks the display straight away, or lets you click one when there are several
-- ScreenCaptureKit (`SCRecordingOutput`) writes an H.264 master; 15/30/60 fps, Retina or 1×, cursor on/off
+- ScreenCaptureKit (`SCRecordingOutput`) writes an H.264 master (with sound, Tinycap writes it itself from the video stream and a separate audio stream); 15/30/60 fps, Retina or 1×, cursor on/off
 - Optional 3-2-1 countdown and click highlights (yellow rings) in every recording mode
+- Optional sound: system audio (everything the Mac plays, in every mode) and the microphone, from the input device you pick in the menu, the area bar or Settings. They're recorded as separate tracks; Microphone permission is asked the first time you turn the mic on. The mic goes through macOS voice processing by default, so speaker sound doesn't echo in it (Settings → Recording → Reduce echo from speakers)
 - While recording, the menu-bar icon shows the elapsed time; click it to stop
 
 **Preview and export**
 - On stop, a preview window plays the clip
 - Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
 - MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
+- Sound plays in the preview, with a switch per source; MP4 mixes the sources that are on into one AAC track, or keeps them as separate tracks for video editors (browsers play only the first). WebM and GIF are video only
 - WebM (VP9) with a quality slider and size; keeps the recording's real frame timing, tagged BT.709 so browsers show the right colors
 - GIF with presets (Small, Balanced, High), frame rate 5–30, size, 32–256 colors, ordered dithering, loop, duplicate-frame dropping, and "Fit under N MB"
 - File-size estimate from a short sample encode, for MP4 and GIF

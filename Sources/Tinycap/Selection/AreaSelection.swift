@@ -311,13 +311,15 @@ final class AreaSelectionView: NSView {
     }
 }
 
-/// Floating bar under the selection. Recording: frame rate, cursor toggle, Cancel and
-/// Record. Screenshot: Cancel and Capture.
+/// Floating bar under the selection. Recording: frame rate, cursor, system audio and
+/// microphone, Cancel and Record. Screenshot: Cancel and Capture.
 final class AreaControlBar: NSVisualEffectView {
     private let onRecord: () -> Void
     private let onCancel: () -> Void
     private let fpsPopup = NSPopUpButton()
     private let cursorCheckbox = NSButton(checkboxWithTitle: "Cursor", target: nil, action: nil)
+    private let systemAudioCheckbox = NSButton(checkboxWithTitle: "System audio", target: nil, action: nil)
+    private let micPopup = NSPopUpButton()
 
     init(purpose: SelectionPurpose, onRecord: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.onRecord = onRecord
@@ -344,12 +346,41 @@ final class AreaControlBar: NSVisualEffectView {
         cursorCheckbox.target = self
         cursorCheckbox.action = #selector(cursorChanged)
 
+        systemAudioCheckbox.state = settings.recordsSystemAudio ? .on : .off
+        systemAudioCheckbox.target = self
+        systemAudioCheckbox.action = #selector(systemAudioChanged)
+
+        // Only saves the choice: Microphone permission is asked after the overlay closes,
+        // so its alert isn't hidden behind it.
+        micPopup.addItem(withTitle: "No mic")
+        micPopup.menu?.addItem(.separator())
+        micPopup.addItem(withTitle: Microphones.systemDefaultTitle)
+        micPopup.lastItem?.representedObject = ""
+        for device in Microphones.available() {
+            micPopup.addItem(withTitle: device.name)
+            micPopup.lastItem?.representedObject = device.id
+        }
+        if settings.recordsMicrophone {
+            let saved = settings.microphoneID ?? ""
+            if let item = micPopup.itemArray.first(where: { $0.representedObject as? String == saved }) {
+                micPopup.select(item)
+            } else {
+                micPopup.selectItem(at: 2) // chosen device unplugged: the system input is used
+            }
+        } else {
+            micPopup.selectItem(at: 0)
+        }
+        micPopup.target = self
+        micPopup.action = #selector(micChanged)
+        micPopup.setAccessibilityLabel("Microphone")
+
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelClicked))
         let record = NSButton(title: purpose == .record ? "Record" : "Capture", target: self, action: #selector(recordClicked))
         record.keyEquivalent = "\r"
         record.bezelColor = purpose == .record ? .systemRed : .controlAccentColor
 
-        let views: [NSView] = purpose == .record ? [fpsPopup, cursorCheckbox, cancel, record] : [cancel, record]
+        let views: [NSView] = purpose == .record
+            ? [fpsPopup, cursorCheckbox, systemAudioCheckbox, micPopup, cancel, record] : [cancel, record]
         let stack = NSStackView(views: views)
         stack.orientation = .horizontal
         stack.spacing = 10
@@ -373,6 +404,20 @@ final class AreaControlBar: NSVisualEffectView {
 
     @objc private func cursorChanged() {
         UserDefaults.standard.set(cursorCheckbox.state == .on, forKey: PreferenceKey.showsCursor)
+    }
+
+    @objc private func systemAudioChanged() {
+        UserDefaults.standard.set(systemAudioCheckbox.state == .on, forKey: PreferenceKey.recordsSystemAudio)
+    }
+
+    @objc private func micChanged() {
+        let defaults = UserDefaults.standard
+        guard let id = micPopup.selectedItem?.representedObject as? String else {
+            defaults.set(false, forKey: PreferenceKey.recordsMicrophone)
+            return
+        }
+        defaults.set(id, forKey: PreferenceKey.microphoneID)
+        defaults.set(true, forKey: PreferenceKey.recordsMicrophone)
     }
 
     @objc private func recordClicked() { onRecord() }

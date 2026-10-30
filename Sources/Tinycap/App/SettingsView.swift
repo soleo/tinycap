@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import ServiceManagement
 import SwiftUI
 import TinycapCore
@@ -180,23 +181,71 @@ private struct RecordingSettingsView: View {
     @AppStorage(PreferenceKey.captureAtNativeScale) private var nativeScale = true
     @AppStorage(PreferenceKey.highlightsClicks) private var highlightsClicks = false
     @AppStorage(PreferenceKey.countdown) private var countdown = false
+    @AppStorage(PreferenceKey.recordsSystemAudio) private var recordsSystemAudio = false
+    @AppStorage(PreferenceKey.recordsMicrophone) private var recordsMicrophone = false
+    @AppStorage(PreferenceKey.microphoneID) private var microphoneID = ""
+    @AppStorage(PreferenceKey.reducesEcho) private var reducesEcho = true
+    @State private var microphones: [MicrophoneDevice] = []
 
     var body: some View {
         Form {
-            Picker("Frame rate", selection: $frameRate) {
-                ForEach(FrameRate.allCases) { rate in
-                    Text("\(rate.rawValue) fps").tag(rate.rawValue)
-                }
+            Section {
+                recordingOptions
             }
-            Toggle("Show cursor", isOn: $showsCursor)
-            Toggle("Highlight clicks", isOn: $highlightsClicks)
-            Toggle("Count down 3-2-1 before recording", isOn: $countdown)
-            Toggle("Record at Retina resolution", isOn: $nativeScale)
-            Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Section("Sound") {
+                Toggle("Record system audio", isOn: $recordsSystemAudio)
+                Toggle("Record microphone", isOn: microphoneBinding)
+                Picker("Microphone", selection: $microphoneID) {
+                    Text(Microphones.systemDefaultTitle).tag("")
+                    ForEach(microphones) { device in
+                        Text(device.name).tag(device.id)
+                    }
+                    if !microphoneID.isEmpty, !microphones.contains(where: { $0.id == microphoneID }) {
+                        Text("Not connected (uses the system input)").tag(microphoneID)
+                    }
+                }
+                .disabled(!recordsMicrophone)
+                Toggle("Reduce echo from speakers", isOn: $reducesEcho)
+                    .disabled(!recordsMicrophone)
+                    .help("Removes the Mac's own sound from the microphone, as FaceTime does. Also evens out the voice level and lowers background noise. Turn it off for a studio microphone or when you wear headphones.")
+                Text("Sound is kept only in MP4 exports, mixed into one track unless you choose separate tracks when exporting. Echo reduction keeps speaker sound out of the microphone; turn it off for a studio microphone or headphones.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear { microphones = Microphones.available() }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasConnectedNotification)) { _ in
+            microphones = Microphones.available()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
+            microphones = Microphones.available()
+        }
+    }
+
+    /// Turning the microphone on asks for permission first (AU-4).
+    private var microphoneBinding: Binding<Bool> {
+        Binding {
+            recordsMicrophone
+        } set: { on in
+            Task { await Microphones.setRecording(on) }
+        }
+    }
+
+    @ViewBuilder
+    private var recordingOptions: some View {
+        Picker("Frame rate", selection: $frameRate) {
+            ForEach(FrameRate.allCases) { rate in
+                Text("\(rate.rawValue) fps").tag(rate.rawValue)
+            }
+        }
+        Toggle("Show cursor", isOn: $showsCursor)
+        Toggle("Highlight clicks", isOn: $highlightsClicks)
+        Toggle("Count down 3-2-1 before recording", isOn: $countdown)
+        Toggle("Record at Retina resolution", isOn: $nativeScale)
+        Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 

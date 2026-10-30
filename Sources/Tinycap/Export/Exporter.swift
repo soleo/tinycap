@@ -29,6 +29,11 @@ struct ExportOptions: Sendable {
     /// Part of the master to keep; nil exports all of it.
     var timeRange: CMTimeRange?
     var format: FormatSettings
+    /// Sound tracks of the master to keep. Only MP4 carries sound; WebM and GIF ignore it.
+    var audioTrackIDs: [CMPersistentTrackID] = []
+    /// Keep each sound source as its own track instead of mixing them into one. Browsers
+    /// (Chrome, Slack, GitHub) play only the first track, so mixing is the default.
+    var separateAudioTracks = false
 }
 
 /// Turns the master .mov into a shareable file. One type per format.
@@ -68,12 +73,21 @@ enum ExportError: LocalizedError {
     }
 }
 
+/// A sound track in a master recording (AU-3).
+struct MasterAudioTrack: Sendable, Equatable, Identifiable {
+    let trackID: CMPersistentTrackID
+    let source: AudioSource
+    var id: CMPersistentTrackID { trackID }
+}
+
 /// Facts about a master recording, loaded once for the preview and estimates.
 struct MasterInfo: Sendable {
     let duration: Double
     /// Encoded pixel size of the video track.
     let pixelSize: CGSize
     let frameRate: Double
+    /// System audio, then microphone; empty for recordings without sound.
+    let audioTracks: [MasterAudioTrack]
 
     static func load(_ url: URL) async throws -> MasterInfo {
         let asset = AVURLAsset(url: url)
@@ -83,8 +97,22 @@ struct MasterInfo: Sendable {
         return MasterInfo(
             duration: max(duration.seconds.isFinite ? duration.seconds : 0, 0),
             pixelSize: size,
-            frameRate: fps > 0 ? Double(fps) : 30
+            frameRate: fps > 0 ? Double(fps) : 30,
+            audioTracks: try await audioTracks(of: asset)
         )
+    }
+
+    /// Sound tracks, identified by the names `CaptureFileWriter` gives them.
+    static func audioTracks(of asset: AVAsset) async throws -> [MasterAudioTrack] {
+        var tracks: [MasterAudioTrack] = []
+        for track in try await asset.loadTracks(withMediaType: .audio) {
+            let metadata = try await track.load(.metadata)
+            let names = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: .quickTimeUserDataTrackName)
+            let name = try await names.first?.load(.stringValue)
+            let source = name.flatMap(AudioSource.init(trackName:)) ?? .system
+            tracks.append(MasterAudioTrack(trackID: track.trackID, source: source))
+        }
+        return tracks.sorted { ($0.source == .system ? 0 : 1, $0.trackID) < ($1.source == .system ? 0 : 1, $1.trackID) }
     }
 }
 

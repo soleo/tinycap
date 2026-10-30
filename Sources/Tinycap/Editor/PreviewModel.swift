@@ -42,6 +42,15 @@ final class PreviewModel {
     var webm: WebMSettings { didSet { persist() } }
     // GIF
     var gif: GIFSettings { didSet { persist() } }
+    /// Sound sources turned off: silent in the preview and left out of the MP4 (AU-5, AU-7).
+    var mutedSources: Set<AudioSource> = [] { didSet { soundChanged() } }
+    /// MP4 keeps each source as its own track (for editing) instead of one mix.
+    var separateAudioTracks = UserDefaults.standard.bool(forKey: PreferenceKey.separateAudioTracks) {
+        didSet {
+            UserDefaults.standard.set(separateAudioTracks, forKey: PreferenceKey.separateAudioTracks)
+            soundChanged()
+        }
+    }
 
     /// "Fit under N MB" for GIF (EX-5).
     enum Fit: Equatable {
@@ -116,7 +125,38 @@ final class PreviewModel {
 
     /// Exporter options for start…end of the master.
     private func options(start: Double, end: Double) -> ExportOptions {
-        ExportOptions(timeRange: CMTimeRange(seconds: start, end), format: formatSettings)
+        ExportOptions(timeRange: CMTimeRange(seconds: start, end), format: formatSettings,
+                      audioTrackIDs: keptAudioTrackIDs, separateAudioTracks: separateAudioTracks)
+    }
+
+    // MARK: - Sound
+
+    var audioTracks: [MasterAudioTrack] { info?.audioTracks ?? [] }
+
+    /// More than one source is kept, so mixing or separate tracks is a choice.
+    var keepsSeveralSources: Bool { keptAudioTrackIDs.count > 1 }
+
+    private var keptAudioTrackIDs: [CMPersistentTrackID] {
+        audioTracks.filter { !mutedSources.contains($0.source) }.map(\.trackID)
+    }
+
+    func isMuted(_ source: AudioSource) -> Bool { mutedSources.contains(source) }
+
+    func setMuted(_ source: AudioSource, _ muted: Bool) {
+        if muted { mutedSources.insert(source) } else { mutedSources.remove(source) }
+    }
+
+    private func soundChanged() {
+        let mix = AVMutableAudioMix()
+        mix.inputParameters = audioTracks.map { track in
+            let parameters = AVMutableAudioMixInputParameters()
+            parameters.trackID = track.trackID
+            parameters.setVolume(mutedSources.contains(track.source) ? 0 : 1, at: .zero)
+            return parameters
+        }
+        player.currentItem?.audioMix = mix
+        if case .exported = phase { phase = .ready }
+        if format == .mp4 { scheduleEstimate() }
     }
 
     /// Re-estimates after settings or trim settle. Encodes ~2 s of the real clip.
@@ -308,7 +348,9 @@ final class PreviewModel {
 
         let options = ExportOptions(
             timeRange: trim.isTrimmed ? CMTimeRange(seconds: trim.start, trim.end) : nil,
-            format: formatSettings
+            format: formatSettings,
+            audioTrackIDs: keptAudioTrackIDs,
+            separateAudioTracks: separateAudioTracks
         )
         let exporter = self.exporter
         let master = self.master

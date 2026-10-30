@@ -132,6 +132,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.isEnabled = !busy
             menu.addItem(item)
         }
+        addSoundItems(enabled: !busy)
 
         menu.addItem(.separator())
         let recentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
@@ -181,6 +182,56 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             submenu.addItem(clear)
         }
         return submenu
+    }
+
+    /// System Audio and Microphone choices for the next recording (AU-1, AU-2). Window
+    /// and screen recordings start straight away, so this is where they're set.
+    private func addSoundItems(enabled: Bool) {
+        let settings = RecordingSettings(defaults: .standard)
+        let system = NSMenuItem(title: "Record System Audio", action: #selector(toggleSystemAudio), keyEquivalent: "")
+        system.state = settings.recordsSystemAudio ? .on : .off
+        system.target = self
+        system.isEnabled = enabled
+        menu.addItem(system)
+
+        let mic = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let off = NSMenuItem(title: "Off", action: #selector(chooseMicrophone(_:)), keyEquivalent: "")
+        off.state = settings.recordsMicrophone ? .off : .on
+        submenu.addItem(off)
+        submenu.addItem(.separator())
+        let devices = Microphones.available()
+        let choices: [(title: String, id: String?)] = [(Microphones.systemDefaultTitle, nil)] + devices.map { ($0.name, $0.id) }
+        for choice in choices {
+            let item = NSMenuItem(title: choice.title, action: #selector(chooseMicrophone(_:)), keyEquivalent: "")
+            item.representedObject = choice.id ?? ""
+            item.state = settings.recordsMicrophone && settings.microphoneID == choice.id ? .on : .off
+            submenu.addItem(item)
+        }
+        if settings.recordsMicrophone, let saved = settings.microphoneID, !devices.contains(where: { $0.id == saved }) {
+            let missing = NSMenuItem(title: "Chosen Microphone (Not Connected)", action: nil, keyEquivalent: "")
+            missing.state = .on
+            missing.isEnabled = false
+            submenu.addItem(missing)
+        }
+        submenu.items.forEach { if $0.action != nil { $0.target = self } }
+        mic.submenu = submenu
+        mic.isEnabled = enabled
+        menu.addItem(mic)
+    }
+
+    @objc private func toggleSystemAudio() {
+        let key = PreferenceKey.recordsSystemAudio
+        UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: key), forKey: key)
+    }
+
+    @objc private func chooseMicrophone(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else {
+            Task { await Microphones.setRecording(false) }
+            return
+        }
+        Task { await Microphones.choose(id.isEmpty ? nil : id) }
     }
 
     @objc private func record(_ sender: NSMenuItem) {

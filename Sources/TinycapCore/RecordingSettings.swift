@@ -17,6 +17,12 @@ public enum PreferenceKey {
     public static let captureAtNativeScale = "recording.captureAtNativeScale"
     public static let highlightsClicks = "recording.highlightsClicks"
     public static let countdown = "recording.countdown"
+    public static let recordsSystemAudio = "recording.systemAudio"
+    public static let recordsMicrophone = "recording.microphone"
+    /// Unique ID of the chosen input device; empty or missing means the system input.
+    public static let microphoneID = "recording.microphoneID"
+    /// Record the microphone with macOS voice processing, which removes speaker echo.
+    public static let reducesEcho = "recording.reducesEcho"
     public static let lastError = "diagnostics.lastError"
     public static let filenamePattern = "export.filenamePattern"
     public static let saveFolderBookmark = "export.saveFolderBookmark"
@@ -34,6 +40,8 @@ public enum PreferenceKey {
     public static let gifFitTargetMB = "gif.fitTargetMB"
     public static let webmQuality = "webm.quality"
     public static let webmScale = "webm.scale"
+    /// MP4 keeps system audio and the microphone as separate tracks instead of one mix.
+    public static let separateAudioTracks = "export.separateAudioTracks"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [
@@ -42,12 +50,16 @@ public enum PreferenceKey {
             captureAtNativeScale: true,
             highlightsClicks: false,
             countdown: false,
+            recordsSystemAudio: false,
+            recordsMicrophone: false,
+            reducesEcho: true,
             filenamePattern: FilenamePattern.defaultPattern,
             exportCodec: VideoCodec.h264.rawValue,
             exportQuality: ExportSettings.defaultQuality,
             exportScale: OutputScale.full.storageValue,
             exportFormat: ExportFormat.mp4.rawValue,
             gifFitTargetMB: 10,
+            separateAudioTracks: false,
         ])
     }
 }
@@ -62,19 +74,40 @@ public struct RecordingSettings: Sendable, Equatable {
     public var highlightsClicks: Bool
     /// Show a 3-2-1 countdown before capture begins (MB, optional).
     public var countdown: Bool
+    /// Record everything the Mac plays, in every mode (AU-1).
+    public var recordsSystemAudio: Bool
+    /// Record the microphone (AU-2).
+    public var recordsMicrophone: Bool
+    /// Input device to record from; nil means the system input.
+    public var microphoneID: String?
+    /// Remove speaker sound from the microphone (voice processing). On by default.
+    public var reducesEcho: Bool
 
     public init(
         frameRate: FrameRate = .default,
         showsCursor: Bool = true,
         captureAtNativeScale: Bool = true,
         highlightsClicks: Bool = false,
-        countdown: Bool = false
+        countdown: Bool = false,
+        recordsSystemAudio: Bool = false,
+        recordsMicrophone: Bool = false,
+        microphoneID: String? = nil,
+        reducesEcho: Bool = true
     ) {
         self.frameRate = frameRate
         self.showsCursor = showsCursor
         self.captureAtNativeScale = captureAtNativeScale
         self.highlightsClicks = highlightsClicks
         self.countdown = countdown
+        self.recordsSystemAudio = recordsSystemAudio
+        self.recordsMicrophone = recordsMicrophone
+        self.microphoneID = microphoneID
+        self.reducesEcho = reducesEcho
+    }
+
+    /// The sound sources this recording captures, in track order.
+    public var audioSources: [AudioSource] {
+        (recordsSystemAudio ? [.system] : []) + (recordsMicrophone ? [.microphone] : [])
     }
 
     public init(defaults: UserDefaults) {
@@ -83,7 +116,11 @@ public struct RecordingSettings: Sendable, Equatable {
             showsCursor: defaults.object(forKey: PreferenceKey.showsCursor) as? Bool ?? true,
             captureAtNativeScale: defaults.object(forKey: PreferenceKey.captureAtNativeScale) as? Bool ?? true,
             highlightsClicks: defaults.bool(forKey: PreferenceKey.highlightsClicks),
-            countdown: defaults.bool(forKey: PreferenceKey.countdown)
+            countdown: defaults.bool(forKey: PreferenceKey.countdown),
+            recordsSystemAudio: defaults.bool(forKey: PreferenceKey.recordsSystemAudio),
+            recordsMicrophone: defaults.bool(forKey: PreferenceKey.recordsMicrophone),
+            microphoneID: defaults.string(forKey: PreferenceKey.microphoneID).flatMap { $0.isEmpty ? nil : $0 },
+            reducesEcho: defaults.object(forKey: PreferenceKey.reducesEcho) as? Bool ?? true
         )
     }
 }
