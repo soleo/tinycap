@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import ServiceManagement
 import SwiftUI
 import TinycapCore
@@ -180,23 +181,67 @@ private struct RecordingSettingsView: View {
     @AppStorage(PreferenceKey.captureAtNativeScale) private var nativeScale = true
     @AppStorage(PreferenceKey.highlightsClicks) private var highlightsClicks = false
     @AppStorage(PreferenceKey.countdown) private var countdown = false
+    @AppStorage(PreferenceKey.recordsSystemAudio) private var recordsSystemAudio = false
+    @AppStorage(PreferenceKey.recordsMicrophone) private var recordsMicrophone = false
+    @AppStorage(PreferenceKey.microphoneID) private var microphoneID = ""
+    @State private var microphones: [MicrophoneDevice] = []
 
     var body: some View {
         Form {
-            Picker("Frame rate", selection: $frameRate) {
-                ForEach(FrameRate.allCases) { rate in
-                    Text("\(rate.rawValue) fps").tag(rate.rawValue)
-                }
+            Section {
+                recordingOptions
             }
-            Toggle("Show cursor", isOn: $showsCursor)
-            Toggle("Highlight clicks", isOn: $highlightsClicks)
-            Toggle("Count down 3-2-1 before recording", isOn: $countdown)
-            Toggle("Record at Retina resolution", isOn: $nativeScale)
-            Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Section("Sound") {
+                Toggle("Record system audio", isOn: $recordsSystemAudio)
+                Toggle("Record microphone", isOn: microphoneBinding)
+                Picker("Microphone", selection: $microphoneID) {
+                    Text(Microphones.systemDefaultTitle).tag("")
+                    ForEach(microphones) { device in
+                        Text(device.name).tag(device.id)
+                    }
+                    if !microphoneID.isEmpty, !microphones.contains(where: { $0.id == microphoneID }) {
+                        Text("Not connected (uses the system input)").tag(microphoneID)
+                    }
+                }
+                .disabled(!recordsMicrophone)
+                Text("Sound is kept only in MP4 exports, with system audio and the microphone on separate tracks. Wear headphones to keep speaker sound out of the microphone.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear { microphones = Microphones.available() }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasConnectedNotification)) { _ in
+            microphones = Microphones.available()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
+            microphones = Microphones.available()
+        }
+    }
+
+    /// Turning the microphone on asks for permission first (AU-4).
+    private var microphoneBinding: Binding<Bool> {
+        Binding {
+            recordsMicrophone
+        } set: { on in
+            Task { await Microphones.setRecording(on) }
+        }
+    }
+
+    @ViewBuilder
+    private var recordingOptions: some View {
+        Picker("Frame rate", selection: $frameRate) {
+            ForEach(FrameRate.allCases) { rate in
+                Text("\(rate.rawValue) fps").tag(rate.rawValue)
+            }
+        }
+        Toggle("Show cursor", isOn: $showsCursor)
+        Toggle("Highlight clicks", isOn: $highlightsClicks)
+        Toggle("Count down 3-2-1 before recording", isOn: $countdown)
+        Toggle("Record at Retina resolution", isOn: $nativeScale)
+        Text("Turn off Retina resolution to record at 1×, which makes smaller files.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 
