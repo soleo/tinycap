@@ -95,9 +95,36 @@ struct PreviewView: View {
             case .webm: webmOptions
             case .gif: gifOptions
             }
+            if !model.audioTracks.isEmpty {
+                soundRow
+            }
             GridRow {
                 Text("")
                 summary
+            }
+        }
+    }
+
+    /// One switch per recorded source; off mutes it here and leaves it out of the MP4.
+    private var soundRow: some View {
+        GridRow(alignment: .firstTextBaseline) {
+            Text("Sound")
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 14) {
+                    ForEach(model.audioTracks) { track in
+                        Toggle(track.source == .system ? "System audio" : "Microphone", isOn: Binding {
+                            !model.isMuted(track.source)
+                        } set: { on in
+                            model.setMuted(track.source, !on)
+                        })
+                        .toggleStyle(.checkbox)
+                    }
+                }
+                if model.format != .mp4 {
+                    Text("Sound is kept only in MP4.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

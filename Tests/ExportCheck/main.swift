@@ -206,6 +206,51 @@ struct ExportCheck {
                 check(false, "cancel threw nothing (export finished first?)")
             }
             check(!FileManager.default.fileExists(atPath: cancelledWebM.path), "no partial WebM after cancel")
+
+            // Sound (M7): separate system and microphone tracks, kept per source in MP4 only.
+            print("sound")
+            let soundMaster = dir.appendingPathComponent("sound-master.mov")
+            try await writeSoundMaster(to: soundMaster, seconds: 10)
+            let soundInfo = try await MasterInfo.load(soundMaster)
+            check(soundInfo.audioTracks.map(\.source) == [.system, .microphone],
+                  "master sound tracks \(soundInfo.audioTracks.map(\.source.rawValue))")
+            let mp4 = FormatSettings.mp4(ExportSettings(scale: .full))
+            let soundRange = CMTimeRange(start: CMTime(seconds: 2, preferredTimescale: 600), end: CMTime(seconds: 8, preferredTimescale: 600))
+            let soundCases: [(name: String, keep: [AudioSource])] = [
+                ("mp4-both-sources", [.system, .microphone]),
+                ("mp4-mic-only", [.microphone]),
+                ("mp4-no-sound", []),
+            ]
+            for c in soundCases {
+                let out = dir.appendingPathComponent(c.name).appendingPathExtension("mp4")
+                let ids = soundInfo.audioTracks.filter { c.keep.contains($0.source) }.map(\.trackID)
+                try await MP4Exporter().export(master: soundMaster,
+                                               options: ExportOptions(timeRange: soundRange, format: mp4, audioTrackIDs: ids),
+                                               to: out) { _ in }
+                let asset = AVURLAsset(url: out)
+                let tracks = try await MasterInfo.audioTracks(of: asset)
+                check(tracks.map(\.source) == c.keep, "\(c.name): sound tracks \(tracks.map(\.source.rawValue))")
+                for track in try await asset.loadTracks(withMediaType: .audio) {
+                    let range = try await track.load(.timeRange)
+                    check(abs(range.duration.seconds - 6) < 0.15,
+                          "\(c.name): sound track \(track.trackID) lasts \(String(format: "%.2f", range.duration.seconds)) s, expected 6")
+                }
+                let video = try await asset.load(.duration).seconds
+                check(abs(video - 6) < 0.15, "\(c.name): duration \(String(format: "%.2f", video)) s, expected 6")
+            }
+            let withSound = try await MP4Exporter().estimateSize(
+                master: soundMaster,
+                options: ExportOptions(timeRange: nil, format: mp4, audioTrackIDs: soundInfo.audioTracks.map(\.trackID)),
+                start: 0, end: 10)
+            let withoutSound = try await MP4Exporter().estimateSize(
+                master: soundMaster, options: ExportOptions(timeRange: nil, format: mp4), start: 0, end: 10)
+            check(withSound > withoutSound, "estimate counts sound (\(ByteSize.format(withSound)) vs \(ByteSize.format(withoutSound)) without)")
+            let soundWebM = dir.appendingPathComponent("sound-master.webm")
+            try await WebMExporter().export(master: soundMaster,
+                                            options: ExportOptions(timeRange: nil, format: .webm(WebMSettings()),
+                                                                   audioTrackIDs: soundInfo.audioTracks.map(\.trackID)),
+                                            to: soundWebM) { _ in }
+            check(fileSize(soundWebM) > 0, "WebM from a master with sound exports (video only)")
         } catch {
             print("ERROR \(error)")
             failures += 1
@@ -221,6 +266,90 @@ struct ExportCheck {
 
     static func fourCC(_ code: FourCharCode) -> String {
         String(bytes: [24, 16, 8, 0].map { UInt8((code >> $0) & 0xFF) }, encoding: .ascii) ?? "\(code)"
+    }
+
+    /// A small master like `CaptureFileWriter` writes: video plus AAC "System Audio"
+    /// (stereo) and "Microphone" (mono) tracks of sine tones.
+    static func writeSoundMaster(to url: URL, seconds: Int) async throws {
+        let fps = 30, rate = AudioSource.sampleRate
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let video = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 640, AVVideoHeightKey: 400,
+        ])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: video, sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: 640, kCVPixelBufferHeightKey as String: 400,
+        ])
+        writer.add(video)
+        var sound: [(AudioSource, AVAssetWriterInput, CMAudioFormatDescription)] = []
+        for source in AudioSource.allCases {
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate,
+                AVNumberOfChannelsKey: source.channelCount, AVEncoderBitRateKey: source.bitrate,
+            ])
+            let name = AVMutableMetadataItem()
+            name.identifier = .quickTimeUserDataTrackName
+            name.value = source.trackName as NSString
+            input.metadata = [name]
+            writer.add(input)
+            var asbd = AudioStreamBasicDescription(
+                mSampleRate: Double(rate), mFormatID: kAudioFormatLinearPCM,
+                mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+                mBytesPerPacket: UInt32(2 * source.channelCount), mFramesPerPacket: 1,
+                mBytesPerFrame: UInt32(2 * source.channelCount), mChannelsPerFrame: UInt32(source.channelCount),
+                mBitsPerChannel: 16, mReserved: 0)
+            var format: CMAudioFormatDescription?
+            CMAudioFormatDescriptionCreate(allocator: nil, asbd: &asbd, layoutSize: 0, layout: nil,
+                                           magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
+            sound.append((source, input, format!))
+        }
+        guard writer.startWriting() else { throw writer.error ?? ExportError.cannotEncode("can't start sound master") }
+        writer.startSession(atSourceTime: .zero)
+
+        let framesPerVideoFrame = rate / fps
+        for frame in 0..<(fps * seconds) {
+            while !video.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(2)) }
+            var buffer: CVPixelBuffer?
+            guard let pool = adaptor.pixelBufferPool else { throw ExportError.cannotEncode("no pixel buffer pool") }
+            CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+            guard let pb = buffer else { throw ExportError.cannotEncode("no pixel buffer") }
+            CVPixelBufferLockBaseAddress(pb, [])
+            memset(CVPixelBufferGetBaseAddress(pb), Int32(frame % 255), CVPixelBufferGetDataSize(pb))
+            CVPixelBufferUnlockBaseAddress(pb, [])
+            adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(fps)))
+
+            for (source, input, format) in sound {
+                while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(2)) }
+                let first = frame * framesPerVideoFrame
+                let pitch = source == .system ? 440.0 : 220.0
+                var samples = [Int16]()
+                for i in 0..<framesPerVideoFrame {
+                    let value = Int16(sin(2 * .pi * pitch * Double(first + i) / Double(rate)) * 8000)
+                    samples += Array(repeating: value, count: source.channelCount)
+                }
+                input.append(try pcmSample(samples, frames: framesPerVideoFrame, at: first, rate: rate, format: format))
+            }
+        }
+        video.markAsFinished()
+        sound.forEach { $0.1.markAsFinished() }
+        await writer.finishWriting()
+        if writer.status != .completed { throw writer.error ?? ExportError.cannotEncode("sound master write failed") }
+    }
+
+    static func pcmSample(_ samples: [Int16], frames: Int, at start: Int, rate: Int, format: CMAudioFormatDescription) throws -> CMSampleBuffer {
+        let bytes = samples.count * 2
+        var block: CMBlockBuffer?
+        CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: bytes, blockAllocator: nil,
+                                           customBlockSource: nil, offsetToData: 0, dataLength: bytes, flags: 0, blockBufferOut: &block)
+        guard let block else { throw ExportError.cannotEncode("no block buffer") }
+        _ = samples.withUnsafeBytes { CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes) }
+        var sample: CMSampleBuffer?
+        CMAudioSampleBufferCreateReadyWithPacketDescriptions(
+            allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: frames,
+            presentationTimeStamp: CMTime(value: CMTimeValue(start), timescale: CMTimeScale(rate)),
+            packetDescriptions: nil, sampleBufferOut: &sample)
+        guard let sample else { throw ExportError.cannotEncode("no sound sample") }
+        return sample
     }
 
     /// Mostly static "UI" (panels, text-like bars) with a box moving across, like a screen recording.

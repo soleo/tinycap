@@ -48,14 +48,18 @@ enum SizeEstimator {
         return (bytes, seconds)
     }
 
-    /// Encoded frame bytes of a file, read as compressed samples (no decode) so the
-    /// per-file container header of each piece isn't multiplied up. Formats without
-    /// video tracks (GIF) use the file size.
+    /// Encoded sample bytes of a file's video and sound tracks, read as compressed
+    /// samples (no decode) so the per-file container header of each piece isn't
+    /// multiplied up. Formats without such tracks (GIF) use the file size.
     static func mediaBytes(of url: URL) async throws -> Int64 {
         let asset = AVURLAsset(url: url)
-        guard let track = (try? await asset.loadTracks(withMediaType: .video))?.first,
-              let bytes = try? await track.load(.totalSampleDataLength), bytes > 0
-        else {
+        var bytes: Int64 = 0
+        for type in [AVMediaType.video, .audio] {
+            for track in (try? await asset.loadTracks(withMediaType: type)) ?? [] {
+                bytes += (try? await track.load(.totalSampleDataLength)) ?? 0
+            }
+        }
+        guard bytes > 0 else {
             return Int64((try url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         }
         return bytes
