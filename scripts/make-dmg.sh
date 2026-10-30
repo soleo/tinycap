@@ -126,10 +126,17 @@ fi
 
 SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
 echo "$SHA  $(basename "$DMG")" > "$DMG.sha256"
-SIZE="$(du -h "$DMG" | awk '{print $1}')"
+# The size as Finder shows it (decimal units: 1 MB = 1,000,000 bytes), for the release
+# notes and the website. du -h counts disk blocks in binary units, so it reads differently.
+BYTES="$(stat -f %z "$DMG")"
+SIZE="$(awk -v b="$BYTES" 'BEGIN {
+  if (b < 1e6) printf "%d KB", int(b / 1e3 + 0.5)
+  else if (b < 1e9) { s = sprintf("%.1f", b / 1e6); sub(/\.0$/, "", s); printf "%s MB", s }
+  else printf "%.2f GB", b / 1e9
+}')"
 
 echo
-echo "==> $DMG ($SIZE)"
+echo "==> $DMG ($SIZE, $(printf '%s' "$BYTES" | perl -pe '1 while s/^(\d+)(\d{3})/$1,$2/') bytes)"
 echo "    sha256 $SHA"
 if [[ "$UNSIGNED" == "0" ]]; then
   # --- 5. Appcast ------------------------------------------------------------------
