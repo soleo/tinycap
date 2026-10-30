@@ -4,6 +4,8 @@ A small, native macOS menu-bar screen recorder and screenshot tool. Record a win
 
 Requires macOS 15 Sequoia or later. MIT licensed.
 
+Discuss it on [Hacker News](https://news.ycombinator.com/item?id=50304399) or leave a review on [Product Hunt](https://www.producthunt.com/products/tinycap).
+
 ## Install
 
 Download the DMG from the [latest release](https://github.com/soleo/tinycap/releases/latest), or use Homebrew:
