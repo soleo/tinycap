@@ -83,7 +83,7 @@ final class ScreenshotThumbnailController {
 
     private func saveAndFinish() {
         guard !finished else { return }
-        model.save()
+        model.save(existing: .keepBoth)
         if model.savedURL == nil {
             // Couldn't write the file: open the editor rather than lose the shot.
             finish(.edit)

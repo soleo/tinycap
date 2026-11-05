@@ -14,6 +14,8 @@ enum MainMenu {
 
         let file = NSMenu(title: "File")
         file.addItem(withTitle: "Save", action: #selector(ScreenshotEditorWindowController.saveDocument(_:)), keyEquivalent: "s")
+        let saveAs = file.addItem(withTitle: "Save As…", action: #selector(ScreenshotEditorWindowController.saveDocumentAs(_:)), keyEquivalent: "s")
+        saveAs.keyEquivalentModifierMask = [.command, .shift]
         file.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         main.addItem(submenu: file)
 

@@ -1,6 +1,7 @@
 import AppKit
 import Observation
 import TinycapCore
+import UniformTypeIdentifiers
 
 /// One screenshot being marked up: the captured image plus an editable list of
 /// annotations in image pixels (AN-3). Every change goes through `undoManager` (AN-4).
@@ -83,16 +84,26 @@ final class ScreenshotEditorModel {
     var savedURL: URL?
     var message: String?
 
+    /// What was captured, for the file name.
+    let source: CaptureSource
+    /// The name Save and drag-out use, without extension (SX-7). Prefilled from the
+    /// filename pattern.
+    var fileName: String
+    /// A typed name that's already taken; the editor asks Replace or Keep Both.
+    var nameConflict: URL?
+
     @ObservationIgnored private var estimateTask: Task<Void, Never>?
 
     init(_ shot: Screenshot) {
         image = shot.image
         pixelsPerPoint = shot.pixelsPerPoint
+        source = shot.source
         let settings = ScreenshotSettings(defaults: .standard)
         style = settings.style
         format = settings.format
         jpegQuality = settings.jpegQuality
         scale = settings.scale
+        fileName = SaveLocation.shared.suggestedName(for: shot.source, kind: .screenshot, pathExtension: settings.format.fileExtension)
         undoManager.levelsOfUndo = 200
         scheduleEstimate()
     }
@@ -273,28 +284,89 @@ final class ScreenshotEditorModel {
         return true
     }
 
-    /// ⌘S: writes to the save folder with the filename pattern.
-    func save() {
+    enum ExistingFile { case ask, replace, keepBoth }
+
+    /// The field's name made safe (EX-11), or the pattern's name if the field is empty.
+    private var cleanFileName: String {
+        FilenamePattern.clean(fileName, pathExtension: format.fileExtension)
+            ?? SaveLocation.shared.suggestedName(for: source, kind: .screenshot, pathExtension: format.fileExtension)
+    }
+
+    /// ⌘S: writes to the save folder under the name in the filename field. If that name
+    /// is taken, `.ask` sets `nameConflict` and saves nothing; automatic saves pass
+    /// `.keepBoth`.
+    func save(existing: ExistingFile = .ask) {
+        nameConflict = nil
         do {
-            guard let data = renderedData() else { throw CocoaError(.fileWriteUnknown) }
-            let url = try SaveLocation.shared.nextDestination(pathExtension: format.fileExtension, screenshot: true)
-            try data.write(to: url, options: .atomic)
-            RecentRecordings.add(url)
-            savedURL = url
-            message = "Saved \(url.lastPathComponent)"
+            var url = try SaveLocation.shared.destination(named: cleanFileName, pathExtension: format.fileExtension)
+            if FileManager.default.fileExists(atPath: url.path) {
+                switch existing {
+                case .ask:
+                    nameConflict = url
+                    return
+                case .keepBoth:
+                    url = SaveLocation.shared.keepBothURL(for: url)
+                case .replace:
+                    break
+                }
+            }
+            if write(to: url) {
+                fileName = url.deletingPathExtension().lastPathComponent
+            }
         } catch {
-            Diagnostics.record(error, context: "Save screenshot")
+            Diagnostics.record(error, context: "Save folder")
             message = "Couldn't save: \(error.localizedDescription)"
         }
     }
 
-    /// A temporary file for dragging the image out of the editor.
+    /// Save As…: the standard save panel, to pick any name and folder. The panel itself
+    /// asks before replacing a file.
+    func saveAs(in window: NSWindow?) {
+        let panel = NSSavePanel()
+        panel.title = "Save As"
+        panel.nameFieldStringValue = "\(cleanFileName).\(format.fileExtension)"
+        panel.directoryURL = SaveLocation.shared.folderURL
+        panel.allowedContentTypes = [format == .png ? .png : .jpeg]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        let finish: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            self.write(to: url)
+        }
+        if let window {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(panel.runModal())
+        }
+    }
+
+    @discardableResult
+    private func write(to url: URL) -> Bool {
+        do {
+            guard let data = renderedData() else { throw CocoaError(.fileWriteUnknown) }
+            try data.write(to: url, options: .atomic)
+            RecentRecordings.add(url)
+            SaveLocation.shared.noteSaved()
+            savedURL = url
+            message = "Saved \(url.lastPathComponent)"
+            return true
+        } catch {
+            Diagnostics.record(error, context: "Save screenshot")
+            message = "Couldn't save: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// A temporary file for dragging the image out of the editor, named like Save names it.
     func dragFile() -> URL? {
         guard let data = renderedData() else { return nil }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Tinycap Drag", isDirectory: true)
+        // A fresh folder per drag, so the file keeps its name even if an earlier drag
+        // with the same name is still around.
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Tinycap Drag", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let pattern = FilenamePattern(UserDefaults.standard.string(forKey: PreferenceKey.filenamePattern) ?? "").forScreenshots
-        let url = folder.appendingPathComponent(pattern.baseName(for: Date())).appendingPathExtension(format.fileExtension)
+        let url = folder.appendingPathComponent(cleanFileName).appendingPathExtension(format.fileExtension)
         do {
             try data.write(to: url, options: .atomic)
             return url

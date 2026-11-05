@@ -10,8 +10,8 @@ final class PreviewWindowController: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private let onClose: (PreviewWindowController) -> Void
 
-    init(master: URL, onClose: @escaping (PreviewWindowController) -> Void) {
-        model = PreviewModel(master: master)
+    init(master: URL, source: CaptureSource? = nil, onClose: @escaping (PreviewWindowController) -> Void) {
+        model = PreviewModel(master: master, source: source)
         self.onClose = onClose
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 600),
@@ -29,6 +29,11 @@ final class PreviewWindowController: NSObject, NSWindowDelegate {
             rootView: PreviewView(model: model, onDiscard: { [weak self] in self?.discard() })
         )
         window.contentMinSize = NSSize(width: 560, height: 480)
+    }
+
+    /// ⇧⌘S from the hidden main menu: Export As…
+    @objc func saveDocumentAs(_ sender: Any?) {
+        model.exportAs()
     }
 
     func show() {

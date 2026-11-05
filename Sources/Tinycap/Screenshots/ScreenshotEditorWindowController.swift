@@ -63,6 +63,10 @@ final class ScreenshotEditorWindowController: NSObject, NSWindowDelegate, NSMenu
         model.save()
     }
 
+    @objc func saveDocumentAs(_ sender: Any?) {
+        model.saveAs(in: window)
+    }
+
     @objc func undo(_ sender: Any?) {
         model.undoManager.undo()
     }

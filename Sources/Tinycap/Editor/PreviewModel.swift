@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Observation
 import TinycapCore
+import UniformTypeIdentifiers
 
 /// State behind one preview window: playback inside the trim range, export settings,
 /// the live size estimate and the export itself.
@@ -61,24 +62,40 @@ final class PreviewModel {
     }
     private(set) var fit: Fit = .idle
 
+    /// What was recorded, for the file name.
+    let source: CaptureSource
+    /// The export's name without extension (EX-10). Prefilled from the filename pattern.
+    var fileName: String
+    /// The typed name is taken; the view asks Replace or Keep Both.
+    var nameConflict: URL?
+    /// Why the last rename after export failed (EX-13).
+    var renameError: String?
+
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var exportTask: Task<Void, Never>?
     @ObservationIgnored private var estimateTask: Task<Void, Never>?
     @ObservationIgnored private var fitTask: Task<Void, Never>?
     @ObservationIgnored private var applyingFit = false
 
-    init(master: URL) {
+    /// `source` is nil for a recording recovered after a crash; it's then named by the
+    /// time the recording was made.
+    init(master: URL, source: CaptureSource? = nil) {
         self.master = master
+        let created = (try? master.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+        let source = source ?? CaptureSource(date: created ?? Date())
+        self.source = source
         player = AVPlayer(url: master)
         player.actionAtItemEnd = .pause
         let defaults = UserDefaults.standard
-        format = ExportFormat(rawValue: defaults.string(forKey: PreferenceKey.exportFormat) ?? "") ?? .mp4
+        let format = ExportFormat(rawValue: defaults.string(forKey: PreferenceKey.exportFormat) ?? "") ?? .mp4
+        self.format = format
         gif = GIFSettings(defaults: defaults)
         webm = WebMSettings(defaults: defaults)
         let saved = ExportSettings(defaults: defaults)
         codec = saved.codec
         quality = saved.quality
         scale = saved.scale
+        fileName = SaveLocation.shared.suggestedName(for: source, kind: .recording, pathExtension: format.fileExtension)
         observeTime()
         Task { await load() }
     }
@@ -333,16 +350,81 @@ final class PreviewModel {
 
     var canExport: Bool { info != nil && !isExporting }
 
-    func export() {
+    enum ExistingFile { case ask, replace, keepBoth }
+
+    /// Exports under the name in the filename field. If that name is taken, `.ask` sets
+    /// `nameConflict` and exports nothing (EX-11).
+    func export(existing: ExistingFile = .ask) {
         guard canExport else { return }
-        let destination: URL
+        nameConflict = nil
+        let ext = exporter.fileExtension
+        var destination: URL
         do {
-            destination = try SaveLocation.shared.nextDestination(pathExtension: exporter.fileExtension)
+            destination = try SaveLocation.shared.destination(named: cleanFileName, pathExtension: ext)
         } catch {
             Diagnostics.record(error, context: "Save folder")
             phase = .failed("Can't write to the save folder: \(error.localizedDescription)")
             return
         }
+        var replacing = false
+        if FileManager.default.fileExists(atPath: destination.path) {
+            switch existing {
+            case .ask:
+                nameConflict = destination
+                return
+            case .keepBoth:
+                destination = SaveLocation.shared.keepBothURL(for: destination)
+            case .replace:
+                replacing = true
+            }
+        }
+        fileName = destination.deletingPathExtension().lastPathComponent
+        startExport(to: destination, replacing: replacing, inSaveFolder: true)
+    }
+
+    /// The field's name made safe (EX-11), or the pattern's name if the field is empty.
+    private var cleanFileName: String {
+        let ext = exporter.fileExtension
+        return FilenamePattern.clean(fileName, pathExtension: ext)
+            ?? SaveLocation.shared.suggestedName(for: source, kind: .recording, pathExtension: ext)
+    }
+
+    /// Export As…: the standard save panel, to pick any name and folder for this export.
+    /// The panel itself asks before replacing a file.
+    func exportAs() {
+        guard canExport else { return }
+        let ext = exporter.fileExtension
+        let panel = NSSavePanel()
+        panel.title = "Export As"
+        panel.prompt = "Export"
+        panel.nameFieldStringValue = "\(cleanFileName).\(ext)"
+        panel.directoryURL = SaveLocation.shared.folderURL
+        if let type = UTType(filenameExtension: ext) { panel.allowedContentTypes = [type] }
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        let finish: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            self.startExport(to: url, replacing: exists, inSaveFolder: false)
+        }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(panel.runModal())
+        }
+    }
+
+    /// Replacing writes to a staging file and swaps it in only when the export succeeds,
+    /// so a failed or cancelled export leaves the old file alone. In the save folder the
+    /// staging file sits next to the old one; elsewhere Tinycap may only write the file
+    /// the user picked, so it stages in its own temporary folder.
+    private func startExport(to destination: URL, replacing: Bool, inSaveFolder: Bool) {
+        guard canExport else { return }
+        let ext = destination.pathExtension
+        let stagingFolder = inSaveFolder ? destination.deletingLastPathComponent() : FileManager.default.temporaryDirectory
+        let output = replacing
+            ? stagingFolder.appendingPathComponent(".tinycap-\(UUID().uuidString)").appendingPathExtension(ext)
+            : destination
         player.pause()
         phase = .exporting(progress: 0)
 
@@ -356,20 +438,43 @@ final class PreviewModel {
         let master = self.master
         exportTask = Task {
             do {
-                try await exporter.export(master: master, options: options, to: destination) { fraction in
+                try await exporter.export(master: master, options: options, to: output) { fraction in
                     Task { @MainActor in
                         guard case .exporting = self.phase else { return }
                         self.phase = .exporting(progress: fraction)
                     }
                 }
+                if replacing, inSaveFolder {
+                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: output)
+                } else if replacing {
+                    try FileManager.default.removeItem(at: destination)
+                    try FileManager.default.moveItem(at: output, to: destination)
+                }
                 RecentRecordings.add(destination)
+                SaveLocation.shared.noteSaved()
+                renameError = nil
                 phase = .exported(destination)
             } catch is CancellationError {
+                if replacing { try? FileManager.default.removeItem(at: output) }
                 phase = .ready
             } catch {
+                if replacing { try? FileManager.default.removeItem(at: output) }
                 Diagnostics.record(error, context: "Export \(exporter.fileExtension)")
                 phase = .failed(error.localizedDescription)
             }
+        }
+    }
+
+    /// Renames the exported file in place (EX-13).
+    func renameExportedFile(to name: String) {
+        guard let url = exportedURL else { return }
+        do {
+            let renamed = try SaveLocation.shared.rename(url, to: name)
+            renameError = nil
+            fileName = renamed.deletingPathExtension().lastPathComponent
+            phase = .exported(renamed)
+        } catch {
+            renameError = error.localizedDescription
         }
     }
 

@@ -72,12 +72,23 @@ private struct GeneralSettingsView: View {
             }
 
             LabeledContent("File name") {
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 6) {
                     TextField("File name", text: $filenamePattern, prompt: Text(FilenamePattern.defaultPattern))
                         .labelsHidden()
-                    Text("Example: \(FilenamePattern(filenamePattern).baseName(for: Date())).mp4")
+                    // EX-12: click a token to add it to the end.
+                    HStack(spacing: 4) {
+                        ForEach(FilenamePattern.tokens) { token in
+                            Button(token.text) { insert(token.text) }
+                                .help(token.help)
+                        }
+                    }
+                    .controlSize(.mini)
+                    .buttonStyle(.bordered)
+                    Text("Examples: \(example(.recording)).mp4 · \(example(.screenshot)).png")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                        .textSelection(.enabled)
                 }
             }
 
@@ -103,6 +114,19 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func insert(_ token: String) {
+        let base = filenamePattern.trimmingCharacters(in: .whitespaces).isEmpty
+            ? FilenamePattern.defaultPattern : filenamePattern
+        filenamePattern = base.hasSuffix(" ") ? base + token : base + " " + token
+    }
+
+    /// The pattern applied to a sample capture of a Safari window, numbered as the next
+    /// save will be.
+    private func example(_ kind: FilenameContext.Kind) -> String {
+        let context = FilenameContext(kind: kind, app: "Safari", window: "Tinycap", counter: SaveLocation.shared.counter)
+        return FilenamePattern(filenamePattern).baseName(for: context)
     }
 
     private func refreshFolder() {

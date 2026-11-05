@@ -7,12 +7,15 @@ struct Screenshot {
     let image: CGImage
     /// Captured pixels per screen point: 2 on Retina, 1 otherwise. "1×" export divides by this.
     let pixelsPerPoint: Double
+    /// When and what was captured, for the file name.
+    var source = CaptureSource()
 }
 
 /// Captures a still with ScreenCaptureKit's `SCScreenshotManager`. No streams or encoders.
 @MainActor
 enum ScreenshotCapturer {
     static func capture(_ target: CaptureTarget, windowShadow: Bool) async throws -> Screenshot {
+        let source = CaptureSource.describe(target)
         let filter: SCContentFilter
         let config = SCStreamConfiguration()
         config.showsCursor = false
@@ -43,7 +46,7 @@ enum ScreenshotCapturer {
         config.height = max(1, Int((points.height * scale).rounded()))
 
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-        return Screenshot(image: image, pixelsPerPoint: scale)
+        return Screenshot(image: image, pixelsPerPoint: scale, source: source)
     }
 
     /// Tinycap itself, so its windows stay out of screen and area shots. Looked up in the

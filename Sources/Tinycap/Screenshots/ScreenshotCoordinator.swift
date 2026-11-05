@@ -64,7 +64,7 @@ final class ScreenshotCoordinator {
             if model.copyToPasteboard() { NSSound(named: "Tink")?.play() }
         case .save:
             let model = ScreenshotEditorModel(shot)
-            model.save()
+            model.save(existing: .keepBoth)
             if model.savedURL != nil {
                 NSSound(named: "Tink")?.play()
             } else if let message = model.message {

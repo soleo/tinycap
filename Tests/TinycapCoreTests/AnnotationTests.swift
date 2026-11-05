@@ -194,13 +194,6 @@ final class ScreenshotSettingsTests: XCTestCase {
     }
 }
 
-final class ScreenshotFilenameTests: XCTestCase {
-    func testDefaultPatternBecomesScreenshotCustomStays() {
-        XCTAssertEqual(FilenamePattern().forScreenshots.pattern, "Screenshot {date} at {time}")
-        XCTAssertEqual(FilenamePattern("Clip {date}").forScreenshots.pattern, "Clip {date}")
-    }
-}
-
 final class StyleMigrationTests: XCTestCase {
     func testRetiredRedBecomesPink() {
         let defaults = UserDefaults(suiteName: "tinycap.tests.style")!

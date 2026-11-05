@@ -25,6 +25,8 @@ public enum PreferenceKey {
     public static let reducesEcho = "recording.reducesEcho"
     public static let lastError = "diagnostics.lastError"
     public static let filenamePattern = "export.filenamePattern"
+    /// Next value of the `{n}` filename token.
+    public static let filenameCounter = "export.filenameCounter"
     public static let saveFolderBookmark = "export.saveFolderBookmark"
     public static let recentRecordings = "recents.paths"
     public static let exportCodec = "export.codec"

@@ -82,18 +82,63 @@ final class FilenamePatternTests: XCTestCase {
         calendar.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 20, minute: 45, second: 9))!
     }
 
+    private func context(_ kind: FilenameContext.Kind = .recording, app: String? = nil, window: String? = nil, counter: Int = 1) -> FilenameContext {
+        FilenameContext(kind: kind, date: date, app: app, window: window, counter: counter)
+    }
+
     func testDefaultPattern() {
-        XCTAssertEqual(FilenamePattern().baseName(for: date, calendar: calendar), "Recording 2026-10-27 at 20.45")
+        XCTAssertEqual(FilenamePattern().baseName(for: context(), calendar: calendar), "Recording 2026-10-27 at 20.45")
+        XCTAssertEqual(FilenamePattern().baseName(for: context(.screenshot), calendar: calendar), "Screenshot 2026-10-27 at 20.45")
+    }
+
+    func testOldDefaultStillNamesScreenshots() {
+        let old = FilenamePattern("Recording {date} at {time}")
+        XCTAssertEqual(old, FilenamePattern())
+        XCTAssertEqual(old.baseName(for: context(.screenshot), calendar: calendar), "Screenshot 2026-10-27 at 20.45")
+        XCTAssertEqual(FilenamePattern("Clip {date}").baseName(for: context(.screenshot), calendar: calendar), "Clip 2026-10-27")
     }
 
     func testCustomPatternAndSanitizing() {
         let p = FilenamePattern("bug/{date}:{time}.{seconds}")
-        XCTAssertEqual(p.baseName(for: date, calendar: calendar), "bug-2026-10-27-20.45.09")
+        XCTAssertEqual(p.baseName(for: context(), calendar: calendar), "bug-2026-10-27-20.45.09")
+    }
+
+    func testAppWindowAndCounterTokens() {
+        let p = FilenamePattern("{app} - {window} {n}")
+        XCTAssertEqual(p.baseName(for: context(app: "Safari", window: "PR #12: fix/ui", counter: 7), calendar: calendar),
+                       "Safari - PR #12- fix-ui 7")
+        XCTAssertTrue(p.usesCounter)
+        XCTAssertFalse(FilenamePattern().usesCounter)
+    }
+
+    func testMissingAppOrWindowLeavesNoGaps() {
+        let p = FilenamePattern("{app} - {type} {window} {date}")
+        XCTAssertEqual(p.baseName(for: context(), calendar: calendar), "Recording 2026-10-27")
+        XCTAssertEqual(FilenamePattern("{window}").baseName(for: context(.screenshot), calendar: calendar), "Screenshot")
     }
 
     func testEmptyPatternFallsBackToDefault() {
         XCTAssertEqual(FilenamePattern("  ").pattern, FilenamePattern.defaultPattern)
-        XCTAssertEqual(FilenamePattern(".{date}").baseName(for: date, calendar: calendar), "Recording.2026-10-27")
+        XCTAssertEqual(FilenamePattern(".{date}").baseName(for: context(), calendar: calendar), "2026-10-27")
+    }
+
+    func testCleanTypedNames() {
+        XCTAssertEqual(FilenamePattern.clean("  bug/repro: login  "), "bugrepro login")
+        XCTAssertEqual(FilenamePattern.clean("...hidden"), "hidden")
+        XCTAssertEqual(FilenamePattern.clean("demo.mp4", pathExtension: "mp4"), "demo")
+        XCTAssertEqual(FilenamePattern.clean("demo.MP4", pathExtension: "mp4"), "demo")
+        XCTAssertEqual(FilenamePattern.clean("demo.gif", pathExtension: "mp4"), "demo.gif")
+        XCTAssertEqual(FilenamePattern.clean("line\nbreak"), "linebreak")
+        XCTAssertNil(FilenamePattern.clean(" /:. "))
+        XCTAssertNil(FilenamePattern.clean(".mp4", pathExtension: "mp4"))
+    }
+
+    func testCleanTrimsLength() {
+        XCTAssertEqual(FilenamePattern.clean(String(repeating: "a", count: 300))?.count, 200)
+        // 200 three-byte characters would be 600 bytes; the file system allows 255.
+        let wide = FilenamePattern.clean(String(repeating: "录", count: 200))!
+        XCTAssertLessThanOrEqual(wide.utf8.count, 240)
+        XCTAssertEqual(wide.count, 80)
     }
 
     func testUniqueURLAppendsCounter() {
