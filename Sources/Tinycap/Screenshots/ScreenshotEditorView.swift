@@ -112,6 +112,21 @@ private struct EditorToolbar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .alert(conflictTitle, isPresented: conflictShown) {
+            Button("Keep Both") { model.save(existing: .keepBoth) }
+            Button("Replace", role: .destructive) { model.save(existing: .replace) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keep both to save this one with a number added, or replace the file in the folder.")
+        }
+    }
+
+    private var conflictShown: Binding<Bool> {
+        Binding { model.nameConflict != nil } set: { if !$0 { model.nameConflict = nil } }
+    }
+
+    private var conflictTitle: String {
+        "“\(model.nameConflict?.lastPathComponent ?? "")” already exists"
     }
 
     /// A mark with a color is selected, so its style controls apply.
@@ -646,7 +661,7 @@ private struct EditorCanvas: View {
     }
 }
 
-// MARK: - Export bar (SX-1 to SX-3)
+// MARK: - Export bar (SX-1 to SX-3, SX-7)
 
 private struct ExportBar: View {
     @Bindable var model: ScreenshotEditorModel
@@ -663,6 +678,13 @@ private struct ExportBar: View {
                 }
                 .help("Drag the image into another app or Finder")
                 .accessibilityLabel("Drag image")
+
+            FileNameField(
+                name: $model.fileName,
+                pathExtension: model.format.fileExtension,
+                width: 180,
+                onSubmit: { model.save() }
+            )
 
             Picker("Format", selection: $model.format) {
                 ForEach(ScreenshotFormat.allCases) { Text($0.displayName).tag($0) }
@@ -701,6 +723,8 @@ private struct ExportBar: View {
             }
             Button("Copy") { model.copyToPasteboard() }
                 .help("Copy the image with annotations (⌘C)")
+            Button("Save As…") { model.saveAs(in: NSApp.keyWindow) }
+                .help("Choose a name and folder (⇧⌘S)")
             Button("Save") { model.save() }
                 .buttonStyle(.borderedProminent)
                 .help("Save to the Tinycap folder (⌘S)")

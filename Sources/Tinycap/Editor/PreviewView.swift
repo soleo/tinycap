@@ -2,10 +2,14 @@ import SwiftUI
 import TinycapCore
 import UniformTypeIdentifiers
 
-/// Preview window content (ED-1, ED-2, EX-1, EX-4, EX-6, EX-7).
+/// Preview window content (ED-1, ED-2, EX-1, EX-4, EX-6, EX-7, EX-10, EX-13).
 struct PreviewView: View {
     @Bindable var model: PreviewModel
     let onDiscard: () -> Void
+    /// A name field has focus: Space, I and O type into it instead of playing and trimming.
+    @State private var typingName = false
+    @State private var renaming = false
+    @State private var renameText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +28,26 @@ struct PreviewView: View {
             .disabled(model.info == nil && !isFailed)
         }
         .frame(minWidth: 560)
+        .alert(conflictTitle, isPresented: conflictShown) {
+            Button("Keep Both") { model.export(existing: .keepBoth) }
+            Button("Replace", role: .destructive) { model.export(existing: .replace) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keep both to save this one with a number added, or replace the file in the folder.")
+        }
+    }
+
+    private var conflictShown: Binding<Bool> {
+        Binding { model.nameConflict != nil } set: { if !$0 { model.nameConflict = nil } }
+    }
+
+    private var conflictTitle: String {
+        "“\(model.nameConflict?.lastPathComponent ?? "")” already exists"
+    }
+
+    /// A single-key shortcut, off while a name field has focus.
+    private func singleKey(_ key: KeyEquivalent) -> KeyboardShortcut? {
+        typingName ? nil : KeyboardShortcut(key, modifiers: [])
     }
 
     // MARK: - Timeline
@@ -37,7 +61,7 @@ struct PreviewView: View {
                     Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                         .frame(width: 18)
                 }
-                .keyboardShortcut(.space, modifiers: [])
+                .keyboardShortcut(singleKey(.space))
                 .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
                 .help("Play or pause (Space)")
 
@@ -65,10 +89,10 @@ struct PreviewView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Set Start") { model.setStartAtPlayhead() }
-                    .keyboardShortcut("i", modifiers: [])
+                    .keyboardShortcut(singleKey("i"))
                     .help("Trim start to the playhead (I)")
                 Button("Set End") { model.setEndAtPlayhead() }
-                    .keyboardShortcut("o", modifiers: [])
+                    .keyboardShortcut(singleKey("o"))
                     .help("Trim end to the playhead (O)")
                 Button("Reset") { model.resetTrim() }
                     .disabled(!model.trim.isTrimmed)
@@ -82,7 +106,18 @@ struct PreviewView: View {
     private var exportOptions: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
-                Text("Format").gridColumnAlignment(.trailing)
+                Text("Name").gridColumnAlignment(.trailing)
+                FileNameField(
+                    name: $model.fileName,
+                    pathExtension: model.format.fileExtension,
+                    width: 300,
+                    onSubmit: { model.export() },
+                    onFocusChange: { typingName = $0 }
+                )
+                .disabled(model.isExporting)
+            }
+            GridRow {
+                Text("Format")
                 Picker("Format", selection: $model.format) {
                     ForEach(ExportFormat.allCases) { Text($0.displayName).tag($0) }
                 }
@@ -349,9 +384,15 @@ struct PreviewView: View {
     }
 
     private var exportButton: some View {
-        Button("Export") { model.export() }
-            .keyboardShortcut(.defaultAction)
-            .disabled(!model.canExport)
+        HStack(spacing: 8) {
+            Button("Export As…") { model.exportAs() }
+                .help("Choose a name and folder for this export (⇧⌘S)")
+                .disabled(!model.canExport)
+            Button("Export") { model.export() }
+                .keyboardShortcut(.defaultAction)
+                .help("Export to the Tinycap folder with the name above")
+                .disabled(!model.canExport)
+        }
     }
 
     private func exportedFile(_ url: URL) -> some View {
@@ -363,18 +404,56 @@ struct PreviewView: View {
                 .help("Drag the file into another app")
                 .accessibilityLabel("Exported file. Drag to share.")
             VStack(alignment: .leading, spacing: 0) {
-                Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
-                if let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                if renaming {
+                    FileNameField(
+                        name: $renameText,
+                        pathExtension: url.pathExtension,
+                        width: 170,
+                        autofocus: true,
+                        onSubmit: finishRename,
+                        onCancel: { renaming = false; typingName = false },
+                        onFocusChange: { focused in
+                            typingName = focused
+                            if !focused, renaming { finishRename() }
+                        }
+                    )
+                } else {
+                    // EX-13: click the name to rename the saved file.
+                    Text(url.lastPathComponent)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .onTapGesture { startRename(url) }
+                        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+                        .help("Click to rename. Drag into another app to share.")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityHint("Renames the file")
+                        .accessibilityAction { startRename(url) }
+                }
+                if let error = model.renameError {
+                    Text(error).font(.caption).foregroundStyle(.orange).lineLimit(1)
+                } else if let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
                     Text(ByteSize.format(Int64(bytes))).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
-            .frame(maxWidth: 220, alignment: .leading)
+            .frame(maxWidth: 240, alignment: .leading)
             Button("Copy") { model.copyExportedFile() }
                 .help("Copy the file to paste into Slack, Mail or Finder")
             Button("Show in Finder") { model.revealExportedFile() }
-                .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(renaming ? nil : .defaultAction)
         }
+    }
+
+    private func startRename(_ url: URL) {
+        renameText = url.deletingPathExtension().lastPathComponent
+        model.renameError = nil
+        renaming = true
+    }
+
+    private func finishRename() {
+        guard renaming else { return }
+        renaming = false
+        typingName = false
+        model.renameExportedFile(to: renameText)
     }
 }
 

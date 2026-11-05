@@ -35,6 +35,8 @@ final class RecordingCoordinator {
     private var clicks: ClickHighlighter?
     private var windowTracker: Timer?
     private var previews: [PreviewWindowController] = []
+    /// What the current recording shows, for its file name.
+    private var source: CaptureSource?
 
     init(onNeedsPermission: @escaping () -> Void) {
         self.onNeedsPermission = onNeedsPermission
@@ -96,6 +98,7 @@ final class RecordingCoordinator {
         borderRect: CGRect?
     ) async throws {
         let master = try Self.newMasterURL()
+        source = CaptureSource.describe(target)
 
         // A window on its own can't show Tinycap's click rings, so with click highlighting
         // on, record the window's region of its display instead and follow it (RC-4, RC-6).
@@ -286,7 +289,8 @@ final class RecordingCoordinator {
             do {
                 let master = try await recorder.stop()
                 state = .idle
-                openPreview(master)
+                openPreview(master, source: source)
+                source = nil
             } catch {
                 state = .idle
                 present(error, title: "Tinycap couldn't finish the recording")
@@ -296,8 +300,8 @@ final class RecordingCoordinator {
 
     // MARK: - Preview
 
-    private func openPreview(_ master: URL) {
-        let controller = PreviewWindowController(master: master) { [weak self] closed in
+    private func openPreview(_ master: URL, source: CaptureSource? = nil) {
+        let controller = PreviewWindowController(master: master, source: source) { [weak self] closed in
             self?.previews.removeAll { $0 === closed }
         }
         previews.append(controller)
@@ -323,7 +327,7 @@ final class RecordingCoordinator {
         NSApp.activate()
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            masters.prefix(5).forEach(openPreview)
+            masters.prefix(5).forEach { openPreview($0) }
         case .alertSecondButtonReturn:
             masters.forEach { try? FileManager.default.removeItem(at: $0) }
         default:
