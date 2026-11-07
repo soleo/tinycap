@@ -41,11 +41,16 @@ public struct ExportSettings: Sendable, Equatable {
     /// 0 = smallest file, 1 = best quality.
     public var quality: Double
     public var scale: OutputScale
+    /// App Store Preview preset (DV-6): the accepted size for the device, H.264 at
+    /// 30 fps and a fixed bitrate. Codec, quality and scale are ignored while it's on.
+    public var appPreview: Bool
 
-    public init(codec: VideoCodec = .h264, quality: Double = ExportSettings.defaultQuality, scale: OutputScale = .full) {
+    public init(codec: VideoCodec = .h264, quality: Double = ExportSettings.defaultQuality, scale: OutputScale = .full,
+                appPreview: Bool = false) {
         self.codec = codec
         self.quality = min(max(quality, 0), 1)
         self.scale = scale
+        self.appPreview = appPreview
     }
 
     public init(defaults: UserDefaults) {
@@ -59,6 +64,7 @@ public struct ExportSettings: Sendable, Equatable {
     /// Output pixel size for a source of `sourceSize` pixels. Even dimensions, no upscaling.
     public func outputSize(for sourceSize: CGSize) -> (width: Int, height: Int) {
         guard sourceSize.width > 0, sourceSize.height > 0 else { return (2, 2) }
+        if appPreview { return AppPreview.size(for: sourceSize) }
         let factor: CGFloat
         switch scale {
         case .full: factor = 1
@@ -78,6 +84,7 @@ public struct ExportSettings: Sendable, Equatable {
 
     /// Target average bitrate in bits per second.
     public func bitrate(width: Int, height: Int, frameRate: Double) -> Int {
+        if appPreview { return AppPreview.videoBitrate }
         let fps = min(max(frameRate, 1), 120)
         return max(100_000, Int(Double(width * height) * fps * bitsPerPixel))
     }
@@ -85,7 +92,8 @@ public struct ExportSettings: Sendable, Equatable {
     /// Expected file size. Encoders use less on static screens, so this is an upper estimate.
     public func estimatedBytes(sourceSize: CGSize, frameRate: Double, duration: Double) -> Int64 {
         let size = outputSize(for: sourceSize)
-        let bits = Double(bitrate(width: size.width, height: size.height, frameRate: frameRate)) * max(duration, 0)
+        let fps = appPreview ? Double(AppPreview.frameRate) : frameRate
+        let bits = Double(bitrate(width: size.width, height: size.height, frameRate: fps)) * max(duration, 0)
         return Int64(bits / 8 * 1.01) + 4096 // ~1% container overhead + header
     }
 }

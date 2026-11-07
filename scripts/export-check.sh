@@ -31,7 +31,7 @@ xcrun swiftc -target "$TARGET" -swift-version 6 -O -module-cache-path "$MODCACHE
   -o "$OUT/export-check" \
   "$ROOT/Sources/Tinycap/Export/Exporter.swift" "$ROOT/Sources/Tinycap/Export/MP4Exporter.swift" \
   "$ROOT/Sources/Tinycap/Export/SizeEstimator.swift" "$ROOT/Sources/Tinycap/Export/GIFExporter.swift" \
-  "$ROOT/Sources/Tinycap/Export/WebMExporter.swift" \
+  "$ROOT/Sources/Tinycap/Export/WebMExporter.swift" "$ROOT/Sources/Tinycap/Export/SampleBuffer+Timing.swift" \
   "$ROOT/Tests/ExportCheck/main.swift"
 
 "$OUT/export-check" "$OUT"

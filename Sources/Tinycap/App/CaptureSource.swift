@@ -8,6 +8,12 @@ struct CaptureSource {
     var date = Date()
     var app: String?
     var window: String?
+    /// A connected iPhone or iPad (DV-3); `app` holds its name.
+    var isDevice = false
+
+    static func device(named name: String) -> CaptureSource {
+        CaptureSource(app: name, isDevice: true)
+    }
 
     /// A window capture names its own app and title. A screen or area capture names the
     /// frontmost normal window's app inside it, and no window.

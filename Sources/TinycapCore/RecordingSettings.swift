@@ -44,6 +44,8 @@ public enum PreferenceKey {
     public static let webmScale = "webm.scale"
     /// MP4 keeps system audio and the microphone as separate tracks instead of one mix.
     public static let separateAudioTracks = "export.separateAudioTracks"
+    /// Keep a connected iPhone or iPad's own sound when recording it (DV-5).
+    public static let deviceSound = "device.sound"
 
     public static func registerDefaults(in defaults: UserDefaults) {
         defaults.register(defaults: [
@@ -62,6 +64,7 @@ public enum PreferenceKey {
             exportFormat: ExportFormat.mp4.rawValue,
             gifFitTargetMB: 10,
             separateAudioTracks: false,
+            deviceSound: true,
         ])
     }
 }

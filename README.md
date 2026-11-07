@@ -29,11 +29,13 @@ Recording (capture, trim, MP4 / WebM / GIF export), screenshots with an annotati
 - Optional 3-2-1 countdown and click highlights (yellow rings) in every recording mode
 - Optional sound: system audio (everything the Mac plays, in every mode) and the microphone, from the input device you pick in the menu, the area bar or Settings. They're recorded as separate tracks; Microphone permission is asked the first time you turn the mic on. The mic goes through macOS voice processing by default, so speaker sound doesn't echo in it (Settings → Recording → Reduce echo from speakers)
 - While recording, the menu-bar icon shows the elapsed time; click it to stop
+- iPhone and iPad over a cable: each connected, unlocked device that trusts the Mac gets Record <device> and Screenshot <device> in the menu. A window shows its screen live with Record, Stop, Screenshot and a Sound switch for the app's own sounds. macOS lists these devices as cameras, so Camera permission is asked the first time
 
 **Preview and export**
 - On stop, a preview window plays the clip
 - Trim with start/end handles, or press I / O to set them at the playhead; Space plays and pauses (loops inside the trim)
 - MP4 as H.264 or HEVC, quality slider, size Full / Half / fixed width, with output size and an estimated file size
+- App Store Preview preset for device and portrait recordings: the size App Store Connect accepts (886 × 1920 for current iPhones, 1080 × 1920 for Home-button iPhones, 1200 × 1600 for iPad, turned for landscape), H.264 at a constant 30 fps, stereo AAC (silent if there's no sound), and a warning when the clip isn't 15–30 s
 - Sound plays in the preview, with a switch per source; MP4 mixes the sources that are on into one AAC track, or keeps them as separate tracks for video editors (browsers play only the first). WebM and GIF are video only
 - WebM (VP9) with a quality slider and size; keeps the recording's real frame timing, tagged BT.709 so browsers show the right colors
 - GIF with presets (Small, Balanced, High), frame rate 5–30, size, 32–256 colors, ordered dithering, loop, duplicate-frame dropping, and "Fit under N MB"

@@ -7,6 +7,8 @@ import VideoToolbox
 /// AVAssetWriter (hardware H.264/HEVC via VideoToolbox), applying trim, bitrate and scale.
 /// Kept sound is mixed into one AAC track, which every player plays; with
 /// `separateAudioTracks` each source is copied as it is, still its own track (AU-3, AU-6).
+/// The App Store Preview preset (DV-6) letterboxes into the accepted size, writes a
+/// constant 30 fps and always has a stereo sound track, silent if nothing is kept.
 struct MP4Exporter: Exporter {
     let fileExtension = "mp4"
     static let keyframeSeconds = 2.0
@@ -38,7 +40,7 @@ struct MP4Exporter: Exporter {
         guard reader.canAdd(output) else { throw ExportError.cannotEncode("can't read the recording") }
         reader.add(output)
 
-        let fps = nominalFPS > 0 ? Double(nominalFPS) : 30
+        let fps = settings.appPreview ? Double(AppPreview.frameRate) : (nominalFPS > 0 ? Double(nominalFPS) : 30)
         let size = settings.outputSize(for: naturalSize)
         let bitrate = settings.bitrate(width: size.width, height: size.height, frameRate: fps)
         var compression: [String: Any] = [
@@ -48,7 +50,9 @@ struct MP4Exporter: Exporter {
             AVVideoMaxKeyFrameIntervalDurationKey: Self.keyframeSeconds,
             AVVideoAllowFrameReorderingKey: true,
         ]
-        if settings.codec == .h264 {
+        if settings.appPreview {
+            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264High40
+        } else if settings.codec == .h264 {
             compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
         } else {
             compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel as String
@@ -58,7 +62,7 @@ struct MP4Exporter: Exporter {
         let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
         writer.shouldOptimizeForNetworkUse = true // moov first: plays while loading in Slack/GitHub
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: settings.codec == .hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoCodecKey: settings.codec == .hevc && !settings.appPreview ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
             AVVideoWidthKey: size.width,
             AVVideoHeightKey: size.height,
             AVVideoScalingModeKey: AVVideoScalingModeResizeAspect,
@@ -69,9 +73,20 @@ struct MP4Exporter: Exporter {
         guard writer.canAdd(input) else { throw ExportError.cannotEncode("unsupported output settings") }
         writer.add(input)
 
-        var lanes = [EncodePipe.Lane(output: output, input: input, reportsProgress: true)]
+        let frames: () -> CMSampleBuffer?
+        if settings.appPreview {
+            let constant = ConstantFrameRate(source: output, fps: AppPreview.frameRate, range: range)
+            frames = { constant.next() }
+        } else {
+            frames = { output.copyNextSampleBuffer() }
+        }
+        var lanes = [EncodePipe.Lane(next: frames, input: input, reportsProgress: true)]
         let sound = try await asset.loadTracks(withMediaType: .audio).filter { options.audioTrackIDs.contains($0.trackID) }
-        if sound.count > 1, !options.separateAudioTracks {
+        if settings.appPreview {
+            lanes.append(sound.isEmpty
+                ? try Self.silentLane(range: range, writer: writer)
+                : try Self.mixedSoundLane(for: sound, reader: reader, writer: writer, bitrate: AppPreview.audioBitrate))
+        } else if sound.count > 1, !options.separateAudioTracks {
             lanes.append(try Self.mixedSoundLane(for: sound, reader: reader, writer: writer))
         } else {
             for track in sound {
@@ -107,7 +122,8 @@ extension MP4Exporter {
     }
 
     /// Several sound tracks mixed into one stereo AAC track.
-    fileprivate static func mixedSoundLane(for tracks: [AVAssetTrack], reader: AVAssetReader, writer: AVAssetWriter) throws -> EncodePipe.Lane {
+    fileprivate static func mixedSoundLane(for tracks: [AVAssetTrack], reader: AVAssetReader, writer: AVAssetWriter,
+                                           bitrate: Int = AudioSource.system.bitrate) throws -> EncodePipe.Lane {
         let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: AudioSource.sampleRate,
@@ -125,12 +141,117 @@ extension MP4Exporter {
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: AudioSource.sampleRate,
             AVNumberOfChannelsKey: 2,
-            AVEncoderBitRateKey: AudioSource.system.bitrate,
+            AVEncoderBitRateKey: bitrate,
         ])
         input.expectsMediaDataInRealTime = false
         guard writer.canAdd(input) else { throw ExportError.cannotEncode("can't write the recording's sound") }
         writer.add(input)
         return EncodePipe.Lane(output: output, input: input, reportsProgress: false)
+    }
+
+    /// A silent stereo AAC track over `range`: App Store Connect refuses previews
+    /// without sound.
+    fileprivate static func silentLane(range: CMTimeRange, writer: AVAssetWriter) throws -> EncodePipe.Lane {
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: AudioSource.sampleRate,
+            AVNumberOfChannelsKey: 2,
+            AVEncoderBitRateKey: AppPreview.audioBitrate,
+        ])
+        input.expectsMediaDataInRealTime = false
+        guard writer.canAdd(input) else { throw ExportError.cannotEncode("can't write a sound track") }
+        writer.add(input)
+        let silence = try Silence(range: range)
+        return EncodePipe.Lane(next: { silence.next() }, input: input, reportsProgress: false)
+    }
+}
+
+/// Turns a decoded video track into a constant frame rate: one frame every 1/fps
+/// seconds across the range, each the newest source frame at that time. Device
+/// recordings have frames only where the screen changed, at up to 60 fps.
+/// Used on one export queue only.
+private final class ConstantFrameRate {
+    private let source: AVAssetReaderOutput
+    private let interval: CMTime
+    private let end: CMTime
+    private var tick: CMTime
+    private var held: CMSampleBuffer?
+    private var upcoming: CMSampleBuffer?
+    private var sourceDone = false
+
+    init(source: AVAssetReaderOutput, fps: Int, range: CMTimeRange) {
+        self.source = source
+        interval = CMTime(value: 1, timescale: CMTimeScale(fps))
+        tick = range.start
+        end = range.end
+    }
+
+    func next() -> CMSampleBuffer? {
+        while tick < end {
+            if upcoming == nil, !sourceDone {
+                upcoming = source.copyNextSampleBuffer()
+                if upcoming == nil { sourceDone = true }
+            }
+            // Take every source frame due by this tick; the last one is shown.
+            if let frame = upcoming, held == nil || frame.presentationTimeStamp <= tick {
+                held = frame
+                upcoming = nil
+                continue
+            }
+            guard let held else { return nil }
+            let time = tick
+            tick = tick + interval
+            return held.retimed(at: time, duration: interval)
+        }
+        return nil
+    }
+}
+
+/// Silent 48 kHz stereo PCM in 0.1 s buffers across a time range.
+private final class Silence {
+    private static let framesPerBuffer = 4800
+    private let format: CMAudioFormatDescription
+    private var time: CMTime
+    private let end: CMTime
+
+    init(range: CMTimeRange) throws {
+        var description = AudioStreamBasicDescription(
+            mSampleRate: Float64(AudioSource.sampleRate), mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 8, mFramesPerPacket: 1, mBytesPerFrame: 8, mChannelsPerFrame: 2,
+            mBitsPerChannel: 32, mReserved: 0
+        )
+        var format: CMAudioFormatDescription?
+        let status = CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: &description, layoutSize: 0,
+                                                    layout: nil, magicCookieSize: 0, magicCookie: nil,
+                                                    extensions: nil, formatDescriptionOut: &format)
+        guard status == noErr, let format else { throw ExportError.cannotEncode("can't make a silent track") }
+        self.format = format
+        time = CMTimeConvertScale(range.start, timescale: CMTimeScale(AudioSource.sampleRate), method: .roundTowardZero)
+        end = range.end
+    }
+
+    func next() -> CMSampleBuffer? {
+        guard time < end else { return nil }
+        let remaining = Int(CMTimeConvertScale(end - time, timescale: CMTimeScale(AudioSource.sampleRate), method: .roundAwayFromZero).value)
+        let frames = min(Self.framesPerBuffer, max(remaining, 1))
+        let bytes = frames * 8
+        var block: CMBlockBuffer?
+        guard CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: bytes,
+                                                 blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
+                                                 dataLength: bytes, flags: kCMBlockBufferAssureMemoryNowFlag,
+                                                 blockBufferOut: &block) == noErr,
+              let block,
+              CMBlockBufferFillDataBytes(with: 0, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes) == noErr
+        else { return nil }
+        var sample: CMSampleBuffer?
+        guard CMAudioSampleBufferCreateReadyWithPacketDescriptions(allocator: kCFAllocatorDefault, dataBuffer: block,
+                                                                   formatDescription: format, sampleCount: frames,
+                                                                   presentationTimeStamp: time, packetDescriptions: nil,
+                                                                   sampleBufferOut: &sample) == noErr
+        else { return nil }
+        time = time + CMTime(value: CMTimeValue(frames), timescale: CMTimeScale(AudioSource.sampleRate))
+        return sample
     }
 }
 
@@ -139,10 +260,21 @@ extension MP4Exporter {
 /// before/after they run), so this is safe to share.
 private final class EncodePipe: @unchecked Sendable {
     struct Lane {
-        let output: AVAssetReaderOutput
+        /// The next sample to write; nil when there are no more.
+        let next: () -> CMSampleBuffer?
         let input: AVAssetWriterInput
         /// The video lane drives the progress bar.
         let reportsProgress: Bool
+
+        init(next: @escaping () -> CMSampleBuffer?, input: AVAssetWriterInput, reportsProgress: Bool) {
+            self.next = next
+            self.input = input
+            self.reportsProgress = reportsProgress
+        }
+
+        init(output: AVAssetReaderOutput, input: AVAssetWriterInput, reportsProgress: Bool) {
+            self.init(next: { output.copyNextSampleBuffer() }, input: input, reportsProgress: reportsProgress)
+        }
     }
 
     private let reader: AVAssetReader
@@ -218,10 +350,10 @@ private final class EncodePipe: @unchecked Sendable {
         lanes[index].input.requestMediaDataWhenReady(on: queue) { [self] in
             let total = max(range.duration.seconds, 0.001)
             let lane = lanes[index]
-            let (input, output) = (lane.input, lane.output)
+            let input = lane.input
             while input.isReadyForMoreMediaData {
                 guard running.withLock({ $0[index] != nil }) else { return }
-                guard !cancelled.withLock({ $0 }), let sample = output.copyNextSampleBuffer() else {
+                guard !cancelled.withLock({ $0 }), let sample = lane.next() else {
                     input.markAsFinished()
                     finish(index)
                     return

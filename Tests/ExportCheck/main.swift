@@ -260,6 +260,40 @@ struct ExportCheck {
                                                                    audioTrackIDs: soundInfo.audioTracks.map(\.trackID)),
                                             to: soundWebM) { _ in }
             check(fileSize(soundWebM) > 0, "WebM from a master with sound exports (video only)")
+
+            // App Store Preview (DV-6): accepted size, constant 30 fps, H.264, one stereo track.
+            print("app store preview")
+            let phoneMaster = dir.appendingPathComponent("phone-master.mov")
+            try await writeMaster(to: phoneMaster, width: 590, height: 1278, fps: 60, seconds: 20)
+            let previewCases: [(name: String, master: URL, keep: [CMPersistentTrackID], range: (Double, Double), size: (Int, Int))] = [
+                ("preview-iphone-silent", phoneMaster, [], (2, 19), (886, 1920)),
+                ("preview-landscape-sound", soundMaster, soundInfo.audioTracks.map(\.trackID), (0, 10), (1600, 1200)),
+            ]
+            for c in previewCases {
+                let out = dir.appendingPathComponent(c.name).appendingPathExtension("mp4")
+                let range = CMTimeRange(start: CMTime(seconds: c.range.0, preferredTimescale: 600),
+                                        end: CMTime(seconds: c.range.1, preferredTimescale: 600))
+                try await MP4Exporter().export(master: c.master,
+                                               options: ExportOptions(timeRange: range, format: .mp4(ExportSettings(appPreview: true)),
+                                                                      audioTrackIDs: c.keep),
+                                               to: out) { _ in }
+                let asset = AVURLAsset(url: out)
+                let video = try await asset.loadTracks(withMediaType: .video).first!
+                let (size, formats, fps) = try await video.load(.naturalSize, .formatDescriptions, .nominalFrameRate)
+                let codec = formats.first.map { CMFormatDescriptionGetMediaSubType($0) } ?? 0
+                let expected = c.range.1 - c.range.0
+                check(Int(size.width) == c.size.0 && Int(size.height) == c.size.1, "\(c.name): size \(Int(size.width))×\(Int(size.height))")
+                check(codec == kCMVideoCodecType_H264, "\(c.name): codec \(fourCC(codec))")
+                check(abs(Double(fps) - 30) < 0.5, "\(c.name): \(String(format: "%.2f", fps)) fps")
+                let frames = try await countFrames(in: out)
+                check(abs(frames - Int(expected * 30)) <= 1, "\(c.name): \(frames) frames, expected \(Int(expected * 30))")
+                let sound = try await asset.loadTracks(withMediaType: .audio)
+                let channels = try await sound.first?.load(.formatDescriptions).first
+                    .flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame }
+                check(sound.count == 1 && channels == 2, "\(c.name): one stereo sound track (\(sound.count) tracks, \(channels ?? 0) channels)")
+                let duration = try await asset.load(.duration).seconds
+                check(abs(duration - expected) < 0.15, "\(c.name): duration \(String(format: "%.2f", duration)) s, expected \(expected)")
+            }
         } catch {
             print("ERROR \(error)")
             failures += 1
@@ -267,6 +301,20 @@ struct ExportCheck {
 
         print(failures == 0 ? "PASS" : "FAILED (\(failures))")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    static func countFrames(in url: URL) async throws -> Int {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else { return 0 }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        reader.add(output)
+        reader.startReading()
+        var frames = 0
+        while let sample = output.copyNextSampleBuffer() {
+            frames += CMSampleBufferGetNumSamples(sample)
+        }
+        return frames
     }
 
     static func fileSize(_ url: URL) -> Int64 {
@@ -289,9 +337,12 @@ struct ExportCheck {
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: 640, kCVPixelBufferHeightKey as String: 400,
         ])
+        // Real-time inputs: the writer doesn't hold one back waiting for the others to
+        // catch up, which can stall this one-input-at-a-time loop.
+        video.expectsMediaDataInRealTime = true
         writer.add(video)
         var sound: [(AudioSource, AVAssetWriterInput, CMAudioFormatDescription)] = []
-        for source in AudioSource.allCases {
+        for source in [AudioSource.system, .microphone] {
             let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate,
                 AVNumberOfChannelsKey: source.channelCount, AVEncoderBitRateKey: source.bitrate,
@@ -300,6 +351,7 @@ struct ExportCheck {
             name.identifier = .quickTimeUserDataTrackName
             name.value = source.trackName as NSString
             input.metadata = [name]
+            input.expectsMediaDataInRealTime = true
             writer.add(input)
             var asbd = AudioStreamBasicDescription(
                 mSampleRate: Double(rate), mFormatID: kAudioFormatLinearPCM,

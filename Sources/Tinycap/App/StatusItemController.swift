@@ -8,18 +8,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let coordinator: RecordingCoordinator
     private let screenshots: ScreenshotCoordinator
+    private let devices: DeviceCaptureController
     private let openSettings: () -> Void
     private let menu = NSMenu()
     private var timerTask: Task<Void, Never>?
 
-    init(coordinator: RecordingCoordinator, screenshots: ScreenshotCoordinator, openSettings: @escaping () -> Void) {
+    init(coordinator: RecordingCoordinator, screenshots: ScreenshotCoordinator, devices: DeviceCaptureController,
+         openSettings: @escaping () -> Void) {
         self.coordinator = coordinator
         self.screenshots = screenshots
+        self.devices = devices
         self.openSettings = openSettings
         super.init()
         menu.delegate = self
         menu.autoenablesItems = false
-        coordinator.onStateChange = { [weak self] state in self?.apply(state) }
+        coordinator.observeState { [weak self] state in self?.apply(state) }
         UpdateController.shared.onChange = { [weak self] in
             guard let self else { return }
             self.apply(self.coordinator.state)
@@ -117,6 +120,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.isEnabled = !busy
             menu.addItem(item)
         }
+        // One per connected iPhone or iPad (DV-1, DV-4).
+        for device in devices.devices {
+            let item = NSMenuItem(title: "Screenshot \(device.name)", action: #selector(screenshotDevice(_:)), keyEquivalent: "")
+            item.representedObject = device.id
+            item.target = self
+            item.isEnabled = !busy
+            menu.addItem(item)
+        }
         menu.addItem(.separator())
 
         for (action, mode) in [(ShortcutAction.recordWindow, CaptureMode.window), (.recordScreen, .screen), (.recordArea, .area)] {
@@ -128,6 +139,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 item.toolTip = combo.displayString
             }
             item.representedObject = mode.rawValue
+            item.target = self
+            item.isEnabled = !busy
+            menu.addItem(item)
+        }
+        // Opens the device's window, where recording starts (DV-1, DV-2).
+        for device in devices.devices {
+            let item = NSMenuItem(title: "Record \(device.name)", action: #selector(recordDevice(_:)), keyEquivalent: "")
+            item.representedObject = device.id
             item.target = self
             item.isEnabled = !busy
             menu.addItem(item)
@@ -242,6 +261,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func screenshot(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let mode = CaptureMode(rawValue: raw) else { return }
         screenshots.begin(mode)
+    }
+
+    @objc private func recordDevice(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String, let device = devices.devices.first(where: { $0.id == id }) else { return }
+        devices.open(device)
+    }
+
+    @objc private func screenshotDevice(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String, let device = devices.devices.first(where: { $0.id == id }) else { return }
+        devices.screenshot(device)
     }
 
     @objc private func openRecent(_ sender: NSMenuItem) {

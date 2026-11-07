@@ -148,7 +148,7 @@ struct PreviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 14) {
                     ForEach(model.audioTracks) { track in
-                        Toggle(track.source == .system ? "System audio" : "Microphone", isOn: Binding {
+                        Toggle(track.source.displayName, isOn: Binding {
                             !model.isMuted(track.source)
                         } set: { on in
                             model.setMuted(track.source, !on)
@@ -156,7 +156,7 @@ struct PreviewView: View {
                         .toggleStyle(.checkbox)
                     }
                 }
-                if model.format == .mp4, model.keepsSeveralSources {
+                if model.format == .mp4, model.keepsSeveralSources, !model.appPreview {
                     Toggle("Separate tracks for editing", isOn: $model.separateAudioTracks)
                         .toggleStyle(.checkbox)
                         .help("Off: one mixed track that plays everywhere. On: system audio and the microphone as separate tracks, for video editors; browsers, Slack and GitHub play only the first.")
@@ -172,6 +172,28 @@ struct PreviewView: View {
 
     @ViewBuilder
     private var mp4Options: some View {
+        if model.offersAppPreview {
+            GridRow(alignment: .firstTextBaseline) {
+                Text("Preset")
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("App Store Preview", isOn: $model.appPreview)
+                        .toggleStyle(.checkbox)
+                        .help("The size App Store Connect accepts for this device, H.264 at 30 fps with stereo sound")
+                    if let problem = model.appPreviewProblem {
+                        Label(problem, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+        }
+        if !model.appPreview {
+            mp4CustomOptions
+        }
+    }
+
+    @ViewBuilder
+    private var mp4CustomOptions: some View {
         GridRow {
             Text("Codec")
             Picker("Codec", selection: $model.codec) {
