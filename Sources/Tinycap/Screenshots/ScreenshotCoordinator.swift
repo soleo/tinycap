@@ -77,7 +77,7 @@ final class ScreenshotCoordinator {
         }
     }
 
-    private func openEditor(_ shot: Screenshot) {
+    func openEditor(_ shot: Screenshot) {
         let editor = ScreenshotEditorWindowController(shot) { [weak self] closed in
             self?.editors.removeAll { $0 === closed }
         }

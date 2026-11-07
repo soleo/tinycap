@@ -7,7 +7,8 @@ import TinycapCore
 /// with. Video comes from the recording's stream and sound from a separate audio stream,
 /// so sound is the whole system's even when the video is a single window (AU-1).
 ///
-/// Recordings without sound don't use this; they keep `SCRecordingOutput`.
+/// Recordings without sound don't use this; they keep `SCRecordingOutput`. iPhone and
+/// iPad recordings (DV-3) always do, fed from an AVCaptureSession on the same host clock.
 final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     enum WriterError: LocalizedError {
         case noVideo
@@ -22,22 +23,28 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     }
 
     /// Every sample handler and all writer state run on this queue.
-    let queue = DispatchQueue(label: "app.tinycap.capture-writer", qos: .userInitiated)
+    let queue: DispatchQueue
 
     private let writer: AVAssetWriter
     private let video: AVAssetWriterInput
     private let audio: [AudioSource: AVAssetWriterInput]
     private var sessionStart: CMTime?
     private var lastTime: CMTime = .zero
+    private var lastVideoTime: CMTime?
     private var isFinishing = false
 
-    init(url: URL, width: Int, height: Int, frameRate: Int, sources: [AudioSource]) throws {
+    /// `letterbox` fits frames of another size into width × height instead of
+    /// stretching them (a device rotated mid-recording, DV-7). `queue` is the queue the
+    /// caller delivers samples on, if it has one.
+    init(url: URL, width: Int, height: Int, frameRate: Int, sources: [AudioSource],
+         letterbox: Bool = false, queue: DispatchQueue? = nil) throws {
+        self.queue = queue ?? DispatchQueue(label: "app.tinycap.capture-writer", qos: .userInitiated)
         try? FileManager.default.removeItem(at: url)
         writer = try AVAssetWriter(outputURL: url, fileType: .mov)
 
         // A high bitrate: the master is re-encoded on export, so it only has to be clean.
         let bitrate = Double(width * height * frameRate) * 0.2
-        video = AVAssetWriterInput(mediaType: .video, outputSettings: [
+        var videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
@@ -47,8 +54,10 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
                 AVVideoMaxKeyFrameIntervalKey: frameRate * 2,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                 AVVideoAllowFrameReorderingKey: false,
-            ],
-        ])
+            ] as [String: Any],
+        ]
+        if letterbox { videoSettings[AVVideoScalingModeKey] = AVVideoScalingModeResizeAspect }
+        video = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         video.expectsMediaDataInRealTime = true
 
         var audio: [AudioSource: AVAssetWriterInput] = [:]
@@ -83,26 +92,45 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     func stream(_ stream: SCStream, didOutputSampleBuffer sample: CMSampleBuffer, of type: SCStreamOutputType) {
         guard !isFinishing, writer.status == .writing, sample.isValid else { return }
         switch type {
-        case .screen: appendVideo(sample)
+        case .screen: appendScreenFrame(sample)
         case .audio: appendAudio(sample, to: audio[.system])
         case .microphone: appendAudio(sample, to: audio[.microphone])
         @unknown default: break
         }
     }
 
-    private func appendVideo(_ sample: CMSampleBuffer) {
+    private func appendScreenFrame(_ sample: CMSampleBuffer) {
         // ScreenCaptureKit also sends idle and blank frames with no new image; skip them.
         guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
               let raw = attachments.first?[.status] as? Int,
               SCFrameStatus(rawValue: raw) == .complete
         else { return }
+        appendVideo(sample)
+    }
+
+    /// A video frame from an AVCaptureSession, delivered on `queue`.
+    func appendCapturedVideo(_ sample: CMSampleBuffer) {
+        guard !isFinishing, writer.status == .writing, sample.isValid else { return }
+        appendVideo(sample)
+    }
+
+    /// A sound buffer from an AVCaptureSession, delivered on `queue`.
+    func appendCapturedAudio(_ sample: CMSampleBuffer, source: AudioSource) {
+        guard !isFinishing, writer.status == .writing, sample.isValid else { return }
+        appendAudio(sample, to: audio[source])
+    }
+
+    private func appendVideo(_ sample: CMSampleBuffer) {
         let time = sample.presentationTimeStamp
+        // Frames must move forward; one from before a retimed first frame would fail the file.
+        if let lastVideoTime, time <= lastVideoTime { return }
         if sessionStart == nil {
             // The file starts at the first frame; sound from before it is dropped.
             writer.startSession(atSourceTime: time)
             sessionStart = time
         }
         guard video.isReadyForMoreMediaData, video.append(sample) else { return }
+        lastVideoTime = time
         lastTime = max(lastTime, time)
     }
 
@@ -128,10 +156,13 @@ final class CaptureFileWriter: NSObject, SCStreamOutput, @unchecked Sendable {
 
     /// Closes the file after the streams have stopped. The last video frame is held
     /// until the last sound, so a still screen at the end doesn't cut the sound short.
-    func finish() async throws {
+    /// `endingAt` holds it until then too: a device sends no frames while its screen is
+    /// still, so the file would otherwise end at the last change.
+    func finish(endingAt end: CMTime? = nil) async throws {
         let started: Bool = await withCheckedContinuation { done in
             queue.async { [self] in
                 isFinishing = true
+                if let end, end.isValid { lastTime = max(lastTime, end) }
                 guard sessionStart != nil, writer.status == .writing else {
                     if writer.status == .writing { writer.cancelWriting() }
                     done.resume(returning: false)

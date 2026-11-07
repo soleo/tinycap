@@ -5,6 +5,7 @@ import TinycapCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: RecordingCoordinator!
     private let screenshots = ScreenshotCoordinator()
+    private var devices: DeviceCaptureController!
     private var statusItem: StatusItemController!
     private var controlWindow: ControlWindowController!
     private let settingsWindow = SettingsWindowController()
@@ -18,9 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.canStart = { [weak self] in !(self?.screenshots.isSelecting ?? false) }
         screenshots.canStart = { [weak self] in self?.coordinator.state == .idle }
         screenshots.onNeedsPermission = { [weak self] in self?.onboarding.show() }
+        devices = DeviceCaptureController(recording: coordinator, screenshots: screenshots)
+        devices.start()
         statusItem = StatusItemController(
             coordinator: coordinator,
             screenshots: screenshots,
+            devices: devices,
             openSettings: { [weak self] in self?.settingsWindow.show() }
         )
         controlWindow = ControlWindowController(

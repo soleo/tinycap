@@ -5,6 +5,8 @@ import Foundation
 public enum AudioSource: String, Sendable, CaseIterable, Identifiable {
     case system
     case microphone
+    /// A connected iPhone or iPad's own sound (DV-5).
+    case device
 
     public var id: String { rawValue }
 
@@ -13,6 +15,16 @@ public enum AudioSource: String, Sendable, CaseIterable, Identifiable {
         switch self {
         case .system: return "System Audio"
         case .microphone: return "Microphone"
+        case .device: return "Device Audio"
+        }
+    }
+
+    /// Label for the preview's Sound switches.
+    public var displayName: String {
+        switch self {
+        case .system: return "System audio"
+        case .microphone: return "Microphone"
+        case .device: return "Device audio"
         }
     }
 
@@ -21,10 +33,10 @@ public enum AudioSource: String, Sendable, CaseIterable, Identifiable {
         self = source
     }
 
-    /// AAC settings for the master and MP4 export: 48 kHz, stereo for system sound,
-    /// mono for the microphone.
-    public var channelCount: Int { self == .system ? 2 : 1 }
-    public var bitrate: Int { self == .system ? 128_000 : 96_000 }
+    /// AAC settings for the master and MP4 export: 48 kHz, mono for the microphone,
+    /// stereo otherwise.
+    public var channelCount: Int { self == .microphone ? 1 : 2 }
+    public var bitrate: Int { self == .microphone ? 96_000 : 128_000 }
     public static let sampleRate = 48_000
 }
 

@@ -16,10 +16,15 @@ final class RecordingCoordinator {
     }
 
     private(set) var state: State = .idle {
-        didSet { if state != oldValue { onStateChange?(state) } }
+        didSet { if state != oldValue { stateObservers.forEach { $0(state) } } }
     }
 
-    var onStateChange: ((State) -> Void)?
+    private var stateObservers: [(State) -> Void] = []
+
+    /// Called on every state change, after the change.
+    func observeState(_ observer: @escaping (State) -> Void) {
+        stateObservers.append(observer)
+    }
     /// False while a screenshot is being taken, so the two overlays never stack.
     var canStart: () -> Bool = { true }
 
@@ -37,6 +42,11 @@ final class RecordingCoordinator {
     private var previews: [PreviewWindowController] = []
     /// What the current recording shows, for its file name.
     private var source: CaptureSource?
+    /// The iPhone or iPad being recorded, if that's what this recording is (DV-3).
+    private var recordingDevice: DeviceSession?
+
+    /// The device being recorded, while one is.
+    var recordingDeviceID: String? { recordingDevice?.deviceID }
 
     init(onNeedsPermission: @escaping () -> Void) {
         self.onNeedsPermission = onNeedsPermission
@@ -275,11 +285,55 @@ final class RecordingCoordinator {
         return mastersFolder.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
     }
 
+    // MARK: - iPhone and iPad (DV-3)
+
+    /// Records a connected device whose window is open. Same states as a Mac recording,
+    /// so the menu bar timer, the stop shortcut and the menu all stop it.
+    func startRecording(device: DeviceSession, sound: Bool) {
+        guard state == .idle, canStart() else {
+            NSSound.beep()
+            return
+        }
+        state = .selecting
+        Task {
+            do {
+                _ = try SaveLocation.shared.preparedFolder()
+                let master = try Self.newMasterURL()
+                try await device.startRecording(to: master, sound: sound)
+                recordingDevice = device
+                source = .device(named: device.name)
+                state = .recording(startedAt: Date())
+            } catch {
+                state = .idle
+                present(error, title: "Tinycap couldn't start recording")
+            }
+        }
+    }
+
+    private func stopDevice(_ device: DeviceSession) {
+        recordingDevice = nil
+        Task {
+            do {
+                let master = try await device.stopRecording()
+                state = .idle
+                openPreview(master, source: source)
+                source = nil
+            } catch {
+                state = .idle
+                present(error, title: "Tinycap couldn't finish the recording")
+            }
+        }
+    }
+
     // MARK: - Stop
 
     func stop() {
         guard case .recording = state else { return }
         state = .saving
+        if let device = recordingDevice {
+            stopDevice(device)
+            return
+        }
         border?.orderOut(nil)
         border = nil
         stopClickHighlighter()

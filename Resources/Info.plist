@@ -33,6 +33,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Tinycap records your microphone into your recordings when you turn the microphone on. The sound stays on your Mac.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Tinycap shows and records the screen of an iPhone or iPad you connect by cable; macOS lists those devices as cameras. Tinycap doesn't use your Mac's camera.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License. Tinycap contributors.</string>
 	<key>TinycapRepositoryURL</key>

@@ -39,6 +39,9 @@ final class PreviewModel {
     var codec: VideoCodec { didSet { persist() } }
     var quality: Double { didSet { persist() } }
     var scale: OutputScale { didSet { persist() } }
+    /// App Store Preview preset (DV-6). On by default for iPhone and iPad recordings;
+    /// not remembered, since it only suits those.
+    var appPreview: Bool { didSet { persist() } }
     // WebM
     var webm: WebMSettings { didSet { persist() } }
     // GIF
@@ -95,6 +98,7 @@ final class PreviewModel {
         codec = saved.codec
         quality = saved.quality
         scale = saved.scale
+        appPreview = source.isDevice
         fileName = SaveLocation.shared.suggestedName(for: source, kind: .recording, pathExtension: format.fileExtension)
         observeTime()
         Task { await load() }
@@ -124,7 +128,20 @@ final class PreviewModel {
 
     // MARK: - Settings
 
-    var mp4Settings: ExportSettings { ExportSettings(codec: codec, quality: quality, scale: scale) }
+    var mp4Settings: ExportSettings { ExportSettings(codec: codec, quality: quality, scale: scale, appPreview: appPreview) }
+
+    /// Offer the App Store Preview preset for device recordings and portrait clips
+    /// (such as a Simulator window).
+    var offersAppPreview: Bool {
+        guard let info else { return source.isDevice }
+        return source.isDevice || appPreview || info.pixelSize.height > info.pixelSize.width
+    }
+
+    /// Why App Store Connect would refuse the trimmed clip, when the preset is on.
+    var appPreviewProblem: String? {
+        guard format == .mp4, appPreview else { return nil }
+        return AppPreview.durationProblem(trim.length)
+    }
 
     var formatSettings: FormatSettings {
         switch format {
