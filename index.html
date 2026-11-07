@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tinycap — tiny screen recorder and screenshot tool for macOS</title>
-  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or an area, with system audio and your mic if you like, and export MP4, WebM or GIF, or take a screenshot and mark it up with arrows, shapes, highlights, numbered steps, text, pixelation and a crop. Free, open source, and your files stay on your Mac.">
+  <meta name="description" content="Tinycap is a small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen, an area or a connected iPhone or iPad, with system audio and your mic if you like, export App Store app previews, and export MP4, WebM or GIF, or take a screenshot and mark it up with arrows, shapes, highlights, numbered steps, text, pixelation and a crop. Free, open source, and your files stay on your Mac.">
   <meta name="author" content="Xinjiang Shao">
   <meta name="color-scheme" content="light dark">
   <link rel="canonical" href="https://soleo.github.io/tinycap/">
@@ -12,7 +12,7 @@
   <meta property="og:site_name" content="Tinycap">
   <meta property="og:url" content="https://soleo.github.io/tinycap/">
   <meta property="og:title" content="Tinycap — tiny screen recorder and screenshot tool for macOS">
-  <meta property="og:description" content="Record or screenshot a window, a screen or an area from the menu bar. Export MP4, WebM or GIF, or mark up a screenshot with arrows, highlights, numbered steps and pixelation. Free and open source.">
+  <meta property="og:description" content="Record or screenshot a window, a screen, an area or a connected iPhone or iPad from the menu bar. Export MP4, WebM or GIF, or mark up a screenshot with arrows, highlights, numbered steps and pixelation. Free and open source.">
   <meta property="og:image" content="https://soleo.github.io/tinycap/assets/og-image.png">
   <meta property="og:image:secure_url" content="https://soleo.github.io/tinycap/assets/og-image.png">
   <meta property="og:image:type" content="image/png">
@@ -22,13 +22,13 @@
   <meta property="og:locale" content="en_US">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Tinycap — tiny screen recorder and screenshot tool for macOS">
-  <meta name="twitter:description" content="Record or screenshot a window, a screen or an area from the menu bar. Export MP4, WebM or GIF. Free and open source.">
+  <meta name="twitter:description" content="Record or screenshot a window, a screen, an area or a connected iPhone or iPad from the menu bar. Export MP4, WebM or GIF. Free and open source.">
   <meta name="twitter:image" content="https://soleo.github.io/tinycap/assets/og-image.png">
   <meta name="twitter:image:alt" content="Tinycap app icon next to the headline: Capture your screen. Get a small file.">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=0.6.0">
+  <link rel="stylesheet" href="styles.css?v=0.7.0">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -40,6 +40,7 @@
     </a>
     <nav aria-label="Primary">
       <a href="#features">Features</a>
+      <a href="#devices">iPhone &amp; iPad</a>
       <a href="#screenshots">Screenshots</a>
       <a href="#how">How it works</a>
       <a href="#shortcuts">Shortcuts</a>
@@ -53,9 +54,9 @@
       <div class="hero-copy">
         <img class="hero-icon" src="assets/icon-256.png" width="128" height="128" alt="Tinycap app icon: a window inside dashed capture corners, with a pointer">
         <h1>Capture your screen.<br>Get a small file.</h1>
-        <p class="lead">Tinycap lives in your menu bar. Record a window, a screen or an area, with system audio and your mic if you like, and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — or take a <strong>screenshot</strong> and mark it up with arrows, highlights, numbered steps and pixelation. Sized for pull requests, bug reports and chat.</p>
+        <p class="lead">Tinycap lives in your menu bar. Record a window, a screen, an area or a plugged-in <strong>iPhone or iPad</strong>, with system audio and your mic if you like, and export <strong>MP4</strong>, <strong>WebM</strong> or <strong>GIF</strong> — or take a <strong>screenshot</strong> and mark it up with arrows, highlights, numbered steps and pixelation. Sized for pull requests, bug reports and chat.</p>
         <div class="cta">
-          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.6.0/Tinycap-0.6.0.dmg">
+          <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.7.0/Tinycap-0.7.0.dmg">
             <span class="rec" aria-hidden="true"></span> Download for Mac
           </a>
           <a class="button" href="https://github.com/soleo/tinycap">View source</a>
@@ -66,7 +67,7 @@
             <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1359741&amp;theme=light" alt="Tinycap - Tiny screen recorder and screenshot tool for your Mac | Product Hunt" width="250" height="54">
           </picture>
         </a>
-        <p class="fine">Version 0.6.0 (<a href="https://github.com/soleo/tinycap/releases/tag/v0.6.0">what's new</a>) · 6.4 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
+        <p class="fine">Version 0.7.0 (<a href="https://github.com/soleo/tinycap/releases/tag/v0.7.0">what's new</a>) · 5.7 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
         <p class="fine brew">Or with Homebrew: <code>brew install --cask soleo/tap/tinycap</code></p>
       </div>
 
@@ -146,7 +147,26 @@
         </article>
         <article class="tile">
           <h3><span class="glyph" aria-hidden="true">✦</span> Native and light</h3>
-          <p>Built with Swift, SwiftUI and ScreenCaptureKit. A 6.4 MB download that records straight to disk with hardware encoding.</p>
+          <p>Built with Swift, SwiftUI and ScreenCaptureKit. A 5.7 MB download that records straight to disk with hardware encoding.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="devices" class="section">
+      <h2>iPhone and iPad, by cable</h2>
+      <p class="lead">Plug in an iPhone or iPad, unlock it and tap Trust. Record ‹device› and Screenshot ‹device› appear in Tinycap's menu, and a window shows the device's screen live. Demo your iOS app, then export it straight to App Store preview size.</p>
+      <div class="grid shot-tiles">
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">▮</span> Live device window</h3>
+          <p>Record, Stop and Screenshot under the live picture, plus a Sound switch for the app's own sounds. The menu-bar timer and stop shortcut work too.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">◱</span> Full resolution</h3>
+          <p>Recordings and screenshots at the device's own pixels, through the same trim, export and screenshot editor as your Mac captures.</p>
+        </article>
+        <article class="tile">
+          <h3><span class="glyph" aria-hidden="true">★</span> App Store previews</h3>
+          <p>One checkbox: 886 × 1920 for iPhone, 1200 × 1600 for iPad, H.264 at 30 fps with stereo sound, and a warning if the clip isn't 15–30 seconds.</p>
         </article>
       </div>
     </section>
@@ -194,7 +214,7 @@
     <section id="how" class="section">
       <h2>How recording works</h2>
       <ol class="steps">
-        <li><span class="n">1</span><div><h3>Choose</h3><p>Click the menu-bar icon, or press a shortcut, and pick Window, Screen or Area.</p></div></li>
+        <li><span class="n">1</span><div><h3>Choose</h3><p>Click the menu-bar icon, or press a shortcut, and pick Window, Screen, Area or a connected iPhone or iPad.</p></div></li>
         <li><span class="n">2</span><div><h3>Record</h3><p>The icon turns into a timer. Click it, or press ⌃⌥⌘. to stop.</p></div></li>
         <li><span class="n">3</span><div><h3>Trim</h3><p>The preview plays your clip. Cut the start and end.</p></div></li>
         <li><span class="n">4</span><div><h3>Export</h3><p>Pick MP4, WebM or GIF, check the size, export. Copy it, show it in Finder, or drag it straight into Slack or GitHub.</p></div></li>
@@ -234,8 +254,8 @@ open build/Tinycap.app</code></pre>
       <img src="assets/icon-256.png" width="96" height="96" alt="">
       <h2>Try Tinycap</h2>
       <p>Free. On first launch, macOS asks you to allow Screen Recording — Tinycap walks you through it. After that it checks for updates once a day and lets you know quietly.</p>
-      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.6.0/Tinycap-0.6.0.dmg">
-        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.6.0
+      <a class="button primary" href="https://github.com/soleo/tinycap/releases/download/v0.7.0/Tinycap-0.7.0.dmg">
+        <span class="rec" aria-hidden="true"></span> Download Tinycap 0.7.0
       </a>
       <p class="fine brew">Or with Homebrew: <code>brew install --cask soleo/tap/tinycap</code></p>
       <p class="fine"><a href="https://github.com/soleo/tinycap/releases">Changelog, all releases and checksums</a></p>
