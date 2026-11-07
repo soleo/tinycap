@@ -1,0 +1,44 @@
+# Once a day, records the release download totals and redraws the README's chart.
+# GitHub keeps only running totals per file, so the history is this daily snapshot.
+# The CSV and SVG live on gh-pages under stats/, so main gets no daily commits.
+name: Download stats
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: download-stats
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: main
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+      - name: Record and draw
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 main/scripts/download-chart.py site/stats
+      - name: Commit to gh-pages
+        working-directory: site
+        run: |
+          git add stats
+          if git diff --cached --quiet; then
+            echo "No change"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Download stats for $(date -u +%F)"
+          git push

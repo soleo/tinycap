@@ -1,6 +1,8 @@
 # Tinycap
 
-A small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen or a dragged area and save it as MP4, WebM or GIF, or take a screenshot and mark it up with arrows, text, pixelation and a crop. Everything stays on your Mac.
+[![Downloads](https://img.shields.io/github/downloads/soleo/tinycap/total?label=downloads)](https://github.com/soleo/tinycap/releases)
+
+A small, native macOS menu-bar screen recorder and screenshot tool. Record a window, a screen, a dragged area or a connected iPhone or iPad and save it as MP4, WebM or GIF, or take a screenshot and mark it up with arrows, text, pixelation and a crop. Everything stays on your Mac.
 
 Requires macOS 15 Sequoia or later. MIT licensed.
 
@@ -15,6 +17,12 @@ brew install --cask soleo/tap/tinycap
 ```
 
 Tinycap checks for updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`.
+
+## Downloads
+
+<img src="https://raw.githubusercontent.com/soleo/tinycap/gh-pages/stats/downloads.svg" width="760" alt="Tinycap downloads: running totals since tracking started, and downloads and in-app updates per release">
+
+Updated daily by [a workflow](.github/workflows/download-stats.yml) from GitHub's release download counts; the daily numbers are in [downloads.csv](https://github.com/soleo/tinycap/blob/gh-pages/stats/downloads.csv). Downloads are DMGs from the website, this page and Homebrew; in-app updates are Sparkle updates. App Store installs aren't included, and the counts include test installs.
 
 ## Status
 
