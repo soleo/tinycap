@@ -61,7 +61,8 @@ final class DeviceCaptureController {
 
     private func refresh() {
         let found = Self.captureDevices().map { ConnectedDevice(id: $0.uniqueID, name: $0.localizedName) }
-        if found != devices { log.notice("devices: \(found.map(\.name), privacy: .public)") }
+        // Device names often carry the owner's name, so they stay private in the log.
+        if found != devices { log.notice("\(found.count, privacy: .public) device(s): \(found.map(\.name), privacy: .private)") }
         devices = found
         // An unplugged device: keep what was recorded, then close its window.
         for window in windows where !found.contains(where: { $0.id == window.session.deviceID }) {

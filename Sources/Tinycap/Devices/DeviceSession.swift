@@ -85,7 +85,7 @@ final class DeviceSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         if session.canAddOutput(audioOutput) {
             session.addOutput(audioOutput)
         } else {
-            log.notice("\(self.name, privacy: .public) has no sound output")
+            log.notice("\(self.name, privacy: .private) has no sound output")
         }
     }
 
