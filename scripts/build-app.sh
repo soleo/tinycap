@@ -6,6 +6,11 @@
 #   CONFIG=debug scripts/build-app.sh    # debug, current arch only
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh
 #   CHANNEL=appstore scripts/build-app.sh   # App Store build: no Sparkle, no network
+#   VARIANT=dev scripts/build-app.sh     # "Tinycap Dev.app", installs next to the release
+#
+# VARIANT=dev changes the name, bundle ID (app.tinycap.Tinycap.dev) and executable, so
+# macOS keeps its privacy permissions, settings and sandbox container apart from the
+# release copy. It has no updater, so it never replaces itself with a release.
 #
 # PROVISIONING_PROFILE=<path> embeds that profile and adds its application and team
 # identifiers to the entitlements. The App Store build needs one (scripts/make-appstore.sh).
@@ -30,15 +35,22 @@ GIT_COMMIT="$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || 
 if [[ "$GIT_COMMIT" != unknown ]] && [[ -n "$(git -C "$(dirname "$0")/.." status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
   GIT_COMMIT="$GIT_COMMIT-dirty"
 fi
-BUNDLE_ID="${BUNDLE_ID:-app.tinycap.Tinycap}"
+VARIANT="${VARIANT:-release}"
+case "$VARIANT" in
+  release) APP_NAME="Tinycap"; EXECUTABLE="Tinycap"; DEFAULT_BUNDLE_ID="app.tinycap.Tinycap" ;;
+  dev) APP_NAME="Tinycap Dev"; EXECUTABLE="TinycapDev"; DEFAULT_BUNDLE_ID="app.tinycap.Tinycap.dev" ;;
+  *) echo "error: VARIANT must be release or dev" >&2; exit 1 ;;
+esac
+BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 CHANNEL="${CHANNEL:-direct}"
 [[ "$CHANNEL" == direct || "$CHANNEL" == appstore ]] || { echo "error: CHANNEL must be direct or appstore" >&2; exit 1; }
+[[ "$VARIANT" == dev && "$CHANNEL" == appstore ]] && { echo "error: VARIANT=dev is a direct build only" >&2; exit 1; }
 SPARKLE_KEY_FILE="$ROOT/Resources/sparkle-public-key.txt"
 # The appcast is attached to each GitHub release; "latest" always points at the newest.
 FEED_URL="${FEED_URL:-https://github.com/soleo/tinycap/releases/latest/download/appcast.xml}"
 USE_SPARKLE=0
-if [[ "$CHANNEL" == direct ]]; then
+if [[ "$CHANNEL" == direct && "$VARIANT" == release ]]; then
   if [[ -s "$SPARKLE_KEY_FILE" ]]; then
     USE_SPARKLE=1
   else
@@ -47,7 +59,7 @@ if [[ "$CHANNEL" == direct ]]; then
 fi
 OUT="$ROOT/build"
 MODCACHE="$OUT/ModuleCache"
-APP="$OUT/Tinycap.app"
+APP="$OUT/$APP_NAME.app"
 
 if [[ "$CONFIG" == "release" ]]; then
   ARCHS="${ARCHS:-arm64 x86_64}"
@@ -105,11 +117,16 @@ done
 echo "==> Assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-xcrun lipo -create "${binaries[@]}" -output "$APP/Contents/MacOS/Tinycap"
+xcrun lipo -create "${binaries[@]}" -output "$APP/Contents/MacOS/$EXECUTABLE"
 sed -e "s/\$(BUNDLE_ID)/$BUNDLE_ID/" -e "s/\$(VERSION)/$VERSION/" -e "s/\$(BUILD_NUMBER)/$BUILD_NUMBER/" \
   -e "s/\$(BUILD_DATE)/$BUILD_DATE/" -e "s/\$(GIT_COMMIT)/$GIT_COMMIT/" \
   "$ROOT/Resources/Info.plist" > "$APP/Contents/Info.plist"
 PLIST="$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy \
+  -c "Set :CFBundleName $APP_NAME" \
+  -c "Set :CFBundleDisplayName $APP_NAME" \
+  -c "Set :CFBundleExecutable $EXECUTABLE" \
+  "$PLIST"
 if [[ "$USE_SPARKLE" == 1 ]]; then
   # Sparkle settings (direct build only). Checks are on by default (UP-5), so Sparkle's
   # "check automatically?" prompt is skipped; the Settings toggle turns them off.
@@ -194,4 +211,4 @@ sign_flags=(--force --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY")
 codesign "${sign_flags[@]}" "$APP"
 codesign --verify --strict "$APP"
 
-du -sh "$APP" | awk '{print "==> Built " $2 " (" $1 ")"}'
+echo "==> Built $APP ($(du -sh "$APP" | cut -f1))"
