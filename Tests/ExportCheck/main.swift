@@ -294,6 +294,30 @@ struct ExportCheck {
                 let duration = try await asset.load(.duration).seconds
                 check(abs(duration - expected) < 0.15, "\(c.name): duration \(String(format: "%.2f", duration)) s, expected \(expected)")
             }
+
+            // A slow trim drag restarts the size estimate over and over, cancelling each one
+            // mid-encode (#31). Cancelling must never touch a reader or writer a lane is using.
+            print("estimate cancel stress")
+            var cancelledMidway = 0
+            for i in 0..<60 {
+                let start = Double(i % 10) * 0.5
+                let estimate = Task {
+                    try await MP4Exporter().estimateSize(
+                        master: phoneMaster,
+                        options: ExportOptions(timeRange: nil, format: .mp4(ExportSettings(appPreview: true))),
+                        start: start, end: start + 8)
+                }
+                try await Task.sleep(for: .milliseconds(Int.random(in: 0...250)))
+                estimate.cancel()
+                if case .failure(let error) = await estimate.result {
+                    guard error is CancellationError else {
+                        check(false, "cancelled estimate \(i) threw \(error)")
+                        continue
+                    }
+                    cancelledMidway += 1
+                }
+            }
+            check(cancelledMidway > 0, "60 estimates cancelled mid-encode without crashing (\(cancelledMidway) cancelled)")
         } catch {
             print("ERROR \(error)")
             failures += 1

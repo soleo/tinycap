@@ -286,6 +286,8 @@ private final class EncodePipe: @unchecked Sendable {
     /// Lanes still running, by index. A lane that fails ends them all, so none waits on
     /// a writer that has stopped.
     private let running = OSAllocatedUnfairLock(initialState: [Int: CheckedContinuation<Void, Never>]())
+    /// One per lane, held while that lane touches the reader or writer. See `waitForLanes()`.
+    private let laneLocks: [NSLock]
     /// Only touched on the progress lane's queue.
     private var lastReported = -1.0
 
@@ -293,6 +295,7 @@ private final class EncodePipe: @unchecked Sendable {
          progress: @escaping @Sendable (Double) -> Void) {
         self.reader = reader
         self.lanes = lanes
+        laneLocks = lanes.map { _ in NSLock() }
         self.writer = writer
         self.range = range
         self.progress = progress
@@ -323,6 +326,7 @@ private final class EncodePipe: @unchecked Sendable {
             cancelled.withLock { $0 = true }
             finishAll()
         }
+        waitForLanes()
 
         if cancelled.withLock({ $0 }) {
             reader.cancelReading()
@@ -348,30 +352,39 @@ private final class EncodePipe: @unchecked Sendable {
     /// Lanes are reached through `self` (shareable) rather than captured.
     private func pump(index: Int, on queue: DispatchQueue) {
         lanes[index].input.requestMediaDataWhenReady(on: queue) { [self] in
-            let total = max(range.duration.seconds, 0.001)
-            let lane = lanes[index]
-            let input = lane.input
-            while input.isReadyForMoreMediaData {
-                guard running.withLock({ $0[index] != nil }) else { return }
-                guard !cancelled.withLock({ $0 }), let sample = lane.next() else {
-                    input.markAsFinished()
-                    finish(index)
-                    return
-                }
-                guard input.append(sample) else {
-                    input.markAsFinished()
-                    finishAll()
-                    return
-                }
-                guard lane.reportsProgress else { continue }
-                let t = (CMSampleBufferGetPresentationTimeStamp(sample) - range.start).seconds
-                let fraction = min(max(t / total, 0), 0.99)
-                if fraction - lastReported >= 0.01 {
-                    lastReported = fraction
-                    progress(fraction)
+            laneLocks[index].withLock {
+                let total = max(range.duration.seconds, 0.001)
+                let lane = lanes[index]
+                let input = lane.input
+                while running.withLock({ $0[index] != nil }), input.isReadyForMoreMediaData {
+                    guard !cancelled.withLock({ $0 }), let sample = lane.next() else {
+                        input.markAsFinished()
+                        finish(index)
+                        return
+                    }
+                    guard input.append(sample) else {
+                        input.markAsFinished()
+                        finishAll()
+                        return
+                    }
+                    guard lane.reportsProgress else { continue }
+                    let t = (CMSampleBufferGetPresentationTimeStamp(sample) - range.start).seconds
+                    let fraction = min(max(t / total, 0), 0.99)
+                    if fraction - lastReported >= 0.01 {
+                        lastReported = fraction
+                        progress(fraction)
+                    }
                 }
             }
         }
+    }
+
+    /// Waits until no lane is mid-sample. Cancelling or failing ends the lanes at once,
+    /// but a lane's queue may still be reading or appending a sample; cancelling the
+    /// reader or writer under it crashes (#31). Lanes that run after this see they've
+    /// ended and touch nothing.
+    private func waitForLanes() {
+        for lock in laneLocks { lock.withLock {} }
     }
 
     private func finish(_ index: Int) {
