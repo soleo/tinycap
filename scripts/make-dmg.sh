@@ -74,7 +74,7 @@ mkdir -p "$OUT"
 
 # --- 1. App ----------------------------------------------------------------------
 step "Building Tinycap $VERSION ($BUILD_NUMBER), universal release"
-CHANNEL=direct CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" SIGN_IDENTITY="$SIGN_IDENTITY" \
+VARIANT=release CHANNEL=direct CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" SIGN_IDENTITY="$SIGN_IDENTITY" \
   "$ROOT/scripts/build-app.sh"
 
 archs="$(xcrun lipo -archs "$APP/Contents/MacOS/Tinycap")"

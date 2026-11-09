@@ -94,7 +94,7 @@ mkdir -p "$OUT"
 # --- 1. App ----------------------------------------------------------------------
 step "Building Tinycap $VERSION ($BUILD_NUMBER) for the App Store, universal release"
 echo "    signing with $SIGN_IDENTITY, certificate $signing_hash (in the profile)"
-CHANNEL=appstore CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUNDLE_ID="$BUNDLE_ID" \
+VARIANT=release CHANNEL=appstore CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUNDLE_ID="$BUNDLE_ID" \
   SIGN_IDENTITY="$signing_hash" PROVISIONING_PROFILE="$PROVISIONING_PROFILE" \
   "$ROOT/scripts/build-app.sh"
 

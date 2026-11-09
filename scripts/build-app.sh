@@ -7,10 +7,14 @@
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh
 #   CHANNEL=appstore scripts/build-app.sh   # App Store build: no Sparkle, no network
 #   VARIANT=dev scripts/build-app.sh     # "Tinycap Dev.app", installs next to the release
+#   VARIANT=dev CHANNEL=appstore scripts/build-app.sh   # dev copy that behaves like the App Store build
 #
 # VARIANT=dev changes the name, bundle ID (app.tinycap.Tinycap.dev) and executable, so
 # macOS keeps its privacy permissions, settings and sandbox container apart from the
-# release copy. It has no updater, so it never replaces itself with a release.
+# release copy. It has no updater, so it never replaces itself with a release. With
+# CHANNEL=appstore it gets the App Store entitlements and code paths (no Movies folder,
+# asks for a save folder on the first save), for testing them by hand. It's still not
+# for upload: scripts/make-appstore.sh always builds VARIANT=release.
 #
 # PROVISIONING_PROFILE=<path> embeds that profile and adds its application and team
 # identifiers to the entitlements. The App Store build needs one (scripts/make-appstore.sh).
@@ -45,7 +49,6 @@ BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 CHANNEL="${CHANNEL:-direct}"
 [[ "$CHANNEL" == direct || "$CHANNEL" == appstore ]] || { echo "error: CHANNEL must be direct or appstore" >&2; exit 1; }
-[[ "$VARIANT" == dev && "$CHANNEL" == appstore ]] && { echo "error: VARIANT=dev is a direct build only" >&2; exit 1; }
 SPARKLE_KEY_FILE="$ROOT/Resources/sparkle-public-key.txt"
 # The appcast is attached to each GitHub release; "latest" always points at the newest.
 FEED_URL="${FEED_URL:-https://github.com/soleo/tinycap/releases/latest/download/appcast.xml}"
