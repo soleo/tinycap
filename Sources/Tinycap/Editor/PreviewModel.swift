@@ -378,6 +378,8 @@ final class PreviewModel {
         var destination: URL
         do {
             destination = try SaveLocation.shared.destination(named: cleanFileName, pathExtension: ext)
+        } catch SaveLocation.FolderError.notChosen {
+            return
         } catch {
             Diagnostics.record(error, context: "Save folder")
             phase = .failed("Can't write to the save folder: \(error.localizedDescription)")

@@ -89,6 +89,9 @@ final class RecordingCoordinator {
                     }
                 }
                 try await startRecording(selection.target, settings: settings, content: content, borderRect: selection.borderRect)
+            } catch SaveLocation.FolderError.notChosen {
+                // The user closed the save folder panel: a cancel, not an error.
+                state = .idle
             } catch {
                 state = .idle
                 if Permissions.isPermissionError(error) {
@@ -303,6 +306,8 @@ final class RecordingCoordinator {
                 recordingDevice = device
                 source = .device(named: device.name)
                 state = .recording(startedAt: Date())
+            } catch SaveLocation.FolderError.notChosen {
+                state = .idle
             } catch {
                 state = .idle
                 present(error, title: "Tinycap couldn't start recording")

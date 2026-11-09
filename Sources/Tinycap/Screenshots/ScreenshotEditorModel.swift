@@ -313,6 +313,8 @@ final class ScreenshotEditorModel {
             if write(to: url) {
                 fileName = url.deletingPathExtension().lastPathComponent
             }
+        } catch SaveLocation.FolderError.notChosen {
+            return
         } catch {
             Diagnostics.record(error, context: "Save folder")
             message = "Couldn't save: \(error.localizedDescription)"

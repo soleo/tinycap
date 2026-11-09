@@ -152,6 +152,15 @@ else
 fi
 
 ENTITLEMENTS="$ROOT/Resources/Tinycap.entitlements"
+if [[ "$CHANNEL" == direct ]]; then
+  # The direct build saves to ~/Movies/Tinycap until the user picks a folder, which needs
+  # the Movies entitlement. The App Store build has no default folder: App Review wants the
+  # smallest set of entitlements (guideline 2.4.5(i)), so it asks for a folder in the open
+  # panel on the first save and keeps it as a bookmark.
+  ENTITLEMENTS="$OUT/Tinycap-direct.entitlements"
+  cp "$ROOT/Resources/Tinycap.entitlements" "$ENTITLEMENTS"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.assets.movies.read-write bool true" "$ENTITLEMENTS"
+fi
 nested_flags=(--force --sign "$SIGN_IDENTITY")
 [[ "$SIGN_IDENTITY" != "-" ]] && nested_flags+=(--options runtime --timestamp)
 
@@ -170,8 +179,7 @@ if [[ "$USE_SPARKLE" == 1 ]]; then
 
   # The installer service is reached by mach name; the sandbox needs these exceptions.
   # Network access is for the update check and download only, so only this build has it.
-  ENTITLEMENTS="$OUT/Tinycap-direct.entitlements"
-  cp "$ROOT/Resources/Tinycap.entitlements" "$ENTITLEMENTS"
+  # Sparkle is direct-only, so $ENTITLEMENTS is already the direct build's copy.
   /usr/libexec/PlistBuddy \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name array" \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name:0 string $BUNDLE_ID-spks" \
