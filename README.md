@@ -218,7 +218,9 @@ The script removes the light backdrop around the tile, centers it on Apple's 824
 
 ## Privacy
 
-Tinycap's only network request is the daily update check, which you can turn off in Settings → General. The direct build fetches the appcast from GitHub; the App Store build asks Apple's public lookup API for the latest version by bundle ID. No telemetry, analytics or system profile is sent. The app is sandboxed with a network client entitlement for that check and no microphone or camera entitlements. Recordings are saved to `~/Movies/Tinycap` until you choose another folder in Settings. The only file entitlements are the Movies folder and folders you pick.
+The direct build's only network request is the daily update check, which you can turn off in Settings → General; it fetches the appcast from GitHub. The App Store build makes no network requests and has no network entitlement; the App Store keeps it up to date. No telemetry, analytics or system profile is sent.
+
+The app is sandboxed. It can use the microphone, only when you turn it on for a recording, and the camera, because macOS lists an iPhone or iPad connected by cable as a camera; Tinycap never uses your Mac's own camera. The direct build saves recordings to `~/Movies/Tinycap` until you choose another folder in Settings, so it also has the Movies folder entitlement. The App Store build asks you to choose a folder the first time you save and remembers it; the only folders it can reach are the ones you pick.
 
 ## License
 

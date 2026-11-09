@@ -94,7 +94,7 @@ mkdir -p "$OUT"
 # --- 1. App ----------------------------------------------------------------------
 step "Building Tinycap $VERSION ($BUILD_NUMBER) for the App Store, universal release"
 echo "    signing with $SIGN_IDENTITY, certificate $signing_hash (in the profile)"
-CHANNEL=appstore CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUNDLE_ID="$BUNDLE_ID" \
+VARIANT=release CHANNEL=appstore CONFIG=release VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUNDLE_ID="$BUNDLE_ID" \
   SIGN_IDENTITY="$signing_hash" PROVISIONING_PROFILE="$PROVISIONING_PROFILE" \
   "$ROOT/scripts/build-app.sh"
 
@@ -109,6 +109,8 @@ entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 [[ "$entitlements" == *com.apple.security.app-sandbox* ]] || die "the app isn't sandboxed"
 [[ "$entitlements" != *com.apple.security.network* ]] || die "the App Store build shouldn't have network access"
 [[ "$entitlements" != *temporary-exception* ]] || die "temporary sandbox exceptions in the App Store build"
+[[ "$entitlements" != *com.apple.security.assets.* ]] \
+  || die "the App Store build shouldn't have a Movies, Music or Pictures entitlement (App Review 2.4.5(i))"
 [[ "$entitlements" == *"$team.$BUNDLE_ID"* ]] || die "the signature doesn't carry the application identifier"
 codesign --verify --strict --deep "$APP" || die "app signature doesn't verify"
 quarantined="$(xattr -rl "$APP" 2>/dev/null | grep com.apple.quarantine || true)"

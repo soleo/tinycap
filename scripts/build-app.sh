@@ -7,10 +7,14 @@
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh
 #   CHANNEL=appstore scripts/build-app.sh   # App Store build: no Sparkle, no network
 #   VARIANT=dev scripts/build-app.sh     # "Tinycap Dev.app", installs next to the release
+#   VARIANT=dev CHANNEL=appstore scripts/build-app.sh   # dev copy that behaves like the App Store build
 #
 # VARIANT=dev changes the name, bundle ID (app.tinycap.Tinycap.dev) and executable, so
 # macOS keeps its privacy permissions, settings and sandbox container apart from the
-# release copy. It has no updater, so it never replaces itself with a release.
+# release copy. It has no updater, so it never replaces itself with a release. With
+# CHANNEL=appstore it gets the App Store entitlements and code paths (no Movies folder,
+# asks for a save folder on the first save), for testing them by hand. It's still not
+# for upload: scripts/make-appstore.sh always builds VARIANT=release.
 #
 # PROVISIONING_PROFILE=<path> embeds that profile and adds its application and team
 # identifiers to the entitlements. The App Store build needs one (scripts/make-appstore.sh).
@@ -45,7 +49,6 @@ BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 CHANNEL="${CHANNEL:-direct}"
 [[ "$CHANNEL" == direct || "$CHANNEL" == appstore ]] || { echo "error: CHANNEL must be direct or appstore" >&2; exit 1; }
-[[ "$VARIANT" == dev && "$CHANNEL" == appstore ]] && { echo "error: VARIANT=dev is a direct build only" >&2; exit 1; }
 SPARKLE_KEY_FILE="$ROOT/Resources/sparkle-public-key.txt"
 # The appcast is attached to each GitHub release; "latest" always points at the newest.
 FEED_URL="${FEED_URL:-https://github.com/soleo/tinycap/releases/latest/download/appcast.xml}"
@@ -152,6 +155,15 @@ else
 fi
 
 ENTITLEMENTS="$ROOT/Resources/Tinycap.entitlements"
+if [[ "$CHANNEL" == direct ]]; then
+  # The direct build saves to ~/Movies/Tinycap until the user picks a folder, which needs
+  # the Movies entitlement. The App Store build has no default folder: App Review wants the
+  # smallest set of entitlements (guideline 2.4.5(i)), so it asks for a folder in the open
+  # panel on the first save and keeps it as a bookmark.
+  ENTITLEMENTS="$OUT/Tinycap-direct.entitlements"
+  cp "$ROOT/Resources/Tinycap.entitlements" "$ENTITLEMENTS"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.assets.movies.read-write bool true" "$ENTITLEMENTS"
+fi
 nested_flags=(--force --sign "$SIGN_IDENTITY")
 [[ "$SIGN_IDENTITY" != "-" ]] && nested_flags+=(--options runtime --timestamp)
 
@@ -170,8 +182,7 @@ if [[ "$USE_SPARKLE" == 1 ]]; then
 
   # The installer service is reached by mach name; the sandbox needs these exceptions.
   # Network access is for the update check and download only, so only this build has it.
-  ENTITLEMENTS="$OUT/Tinycap-direct.entitlements"
-  cp "$ROOT/Resources/Tinycap.entitlements" "$ENTITLEMENTS"
+  # Sparkle is direct-only, so $ENTITLEMENTS is already the direct build's copy.
   /usr/libexec/PlistBuddy \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name array" \
     -c "Add :com.apple.security.temporary-exception.mach-lookup.global-name:0 string $BUNDLE_ID-spks" \

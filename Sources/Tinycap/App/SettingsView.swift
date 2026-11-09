@@ -45,6 +45,7 @@ private struct GeneralSettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var folderPath = SaveLocation.shared.folderURL.path
     @State private var isCustomFolder = SaveLocation.shared.isCustom
+    @State private var folderReady = SaveLocation.shared.isReady
     @AppStorage(PreferenceKey.filenamePattern) private var filenamePattern = FilenamePattern.defaultPattern
 
     var body: some View {
@@ -54,7 +55,7 @@ private struct GeneralSettingsView: View {
 
             LabeledContent("Save recordings to") {
                 HStack {
-                    Text((folderPath as NSString).abbreviatingWithTildeInPath)
+                    Text(folderReady ? (folderPath as NSString).abbreviatingWithTildeInPath : "Asks on your first save")
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundStyle(.secondary)
@@ -62,7 +63,8 @@ private struct GeneralSettingsView: View {
                         SaveLocation.shared.chooseFolder()
                         refreshFolder()
                     }
-                    if isCustomFolder {
+                    // The App Store build has no default folder to go back to.
+                    if isCustomFolder, SaveLocation.hasDefaultFolder {
                         Button("Reset") {
                             SaveLocation.shared.resetToDefault()
                             refreshFolder()
@@ -132,6 +134,7 @@ private struct GeneralSettingsView: View {
     private func refreshFolder() {
         folderPath = SaveLocation.shared.folderURL.path
         isCustomFolder = SaveLocation.shared.isCustom
+        folderReady = SaveLocation.shared.isReady
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
