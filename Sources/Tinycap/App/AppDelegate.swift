@@ -47,6 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// Quitting while recording waits for the recording to be written, so it isn't lost.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let waits = coordinator?.finishBeforeQuit { sender.reply(toApplicationShouldTerminate: true) } ?? false
+        return waits ? .terminateLater : .terminateNow
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         SaveLocation.shared.stopAccessing()
     }

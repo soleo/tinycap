@@ -45,6 +45,9 @@ final class RecordingCoordinator {
     /// The iPhone or iPad being recorded, if that's what this recording is (DV-3).
     private var recordingDevice: DeviceSession?
 
+    /// Set while the app waits to quit until the recording in progress is on disk.
+    private var onFinishedForQuit: (() -> Void)?
+
     /// The device being recorded, while one is.
     var recordingDeviceID: String? { recordingDevice?.deviceID }
 
@@ -321,10 +324,12 @@ final class RecordingCoordinator {
             do {
                 let master = try await device.stopRecording()
                 state = .idle
+                guard !quitIfWaiting() else { return }
                 openPreview(master, source: source)
                 source = nil
             } catch {
                 state = .idle
+                guard !quitIfWaiting(after: error) else { return }
                 present(error, title: "Tinycap couldn't finish the recording")
             }
         }
@@ -348,13 +353,40 @@ final class RecordingCoordinator {
             do {
                 let master = try await recorder.stop()
                 state = .idle
+                guard !quitIfWaiting() else { return }
                 openPreview(master, source: source)
                 source = nil
             } catch {
                 state = .idle
+                guard !quitIfWaiting(after: error) else { return }
                 present(error, title: "Tinycap couldn't finish the recording")
             }
         }
+    }
+
+    // MARK: - Quit
+
+    /// Finishes the recording in progress before the app quits, then calls `done`: a
+    /// master that was never finished can't be opened again. The finished master is
+    /// offered at the next launch. False if nothing is being recorded.
+    func finishBeforeQuit(_ done: @escaping () -> Void) -> Bool {
+        switch state {
+        case .idle, .selecting:
+            return false
+        case .recording, .saving:
+            onFinishedForQuit = done
+            stop() // Does nothing while saving; that stop reports here when it's done.
+            return true
+        }
+    }
+
+    /// Lets a waiting quit go ahead instead of showing the preview or an error.
+    private func quitIfWaiting(after error: Error? = nil) -> Bool {
+        guard let quit = onFinishedForQuit else { return false }
+        onFinishedForQuit = nil
+        if let error { Diagnostics.record(error, context: "Finish recording before quitting") }
+        quit()
+        return true
     }
 
     // MARK: - Preview
@@ -372,14 +404,30 @@ final class RecordingCoordinator {
         let files = (try? FileManager.default.contentsOfDirectory(
             at: Self.mastersFolder, includingPropertiesForKeys: nil
         )) ?? []
-        let masters = files.filter { $0.pathExtension == "mov" }
-        guard !masters.isEmpty else { return }
+        let found = files.filter { $0.pathExtension == "mov" }
+        guard !found.isEmpty else { return }
 
+        Task {
+            // A master cut off before it was finished (a crash, a force quit) can't be read.
+            var masters: [URL] = []
+            var damaged: [URL] = []
+            for url in found {
+                if (try? await MasterInfo.load(url)) != nil { masters.append(url) } else { damaged.append(url) }
+            }
+            offerDamaged(damaged)
+            offerUnsaved(masters)
+        }
+    }
+
+    private func offerUnsaved(_ masters: [URL]) {
+        guard !masters.isEmpty else { return }
         let alert = NSAlert()
         alert.messageText = masters.count == 1
             ? "Tinycap found a recording that wasn't exported"
             : "Tinycap found \(masters.count) recordings that weren't exported"
-        alert.informativeText = "Open them to trim and export, or delete them."
+        alert.informativeText = masters.count == 1
+            ? "Open it to trim and export, or delete it."
+            : "Open them to trim and export, or delete them."
         alert.addButton(withTitle: masters.count == 1 ? "Open" : "Open All")
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Later")
@@ -389,6 +437,30 @@ final class RecordingCoordinator {
             masters.prefix(5).forEach { openPreview($0) }
         case .alertSecondButtonReturn:
             masters.forEach { try? FileManager.default.removeItem(at: $0) }
+        default:
+            break
+        }
+    }
+
+    /// Unreadable masters can't be opened in the preview, so they're only deleted or shown.
+    private func offerDamaged(_ masters: [URL]) {
+        guard !masters.isEmpty else { return }
+        let alert = NSAlert()
+        alert.messageText = masters.count == 1
+            ? "Tinycap found a recording that can't be opened"
+            : "Tinycap found \(masters.count) recordings that can't be opened"
+        alert.informativeText = masters.count == 1
+            ? "Tinycap stopped before it could finish saving it. Delete it to free the space it takes."
+            : "Tinycap stopped before it could finish saving them. Delete them to free the space they take."
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Show in Finder")
+        alert.addButton(withTitle: "Later")
+        NSApp.activate()
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            masters.forEach { try? FileManager.default.removeItem(at: $0) }
+        case .alertSecondButtonReturn:
+            NSWorkspace.shared.activateFileViewerSelecting(masters)
         default:
             break
         }
