@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="520" viewBox="0 0 760 520" role="img" aria-labelledby="t d">
 <title id="t">Tinycap downloads</title>
-<desc id="d">Tinycap downloads: 93 downloads and 48 in-app updates in total as of 2026-11-14. Per release: v0.1.0 7 downloads, 0 updates; v0.2.0 2 downloads, 0 updates; v0.3.0 5 downloads, 0 updates; v0.4.0 17 downloads, 3 updates; v0.5.0 26 downloads, 7 updates; v0.6.0 9 downloads, 7 updates; v0.7.0 2 downloads, 5 updates; v0.7.1 17 downloads, 5 updates; v0.7.2 3 downloads, 14 updates; v0.7.3 5 downloads, 7 updates.</desc>
+<desc id="d">Tinycap downloads: 95 downloads and 53 in-app updates in total as of 2026-11-15. Per release: v0.1.0 7 downloads, 0 updates; v0.2.0 2 downloads, 0 updates; v0.3.0 5 downloads, 0 updates; v0.4.0 17 downloads, 3 updates; v0.5.0 26 downloads, 7 updates; v0.6.0 9 downloads, 7 updates; v0.7.0 2 downloads, 5 updates; v0.7.1 17 downloads, 5 updates; v0.7.2 3 downloads, 14 updates; v0.7.3 7 downloads, 12 updates.</desc>
 <style>
   .surface { fill: #fcfcfb; }
   .title { fill: #0b0b0b; font: 600 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
@@ -39,14 +39,14 @@
 <text class="tick" x="48" y="115.5" text-anchor="end">75</text>
 <line class="grid" x1="56" x2="724" y1="74.0" y2="74.0"/>
 <text class="tick" x="48" y="78.0" text-anchor="end">100</text>
-<polyline class="s1l" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="56.0,126.5 141.4,126.5 226.9,116.0 312.3,108.5 397.7,101.0 483.1,92.0 568.6,87.5 654.0,84.5"/>
-<circle class="s1 ring" stroke-width="2" cx="654.0" cy="84.5" r="4.5"/>
-<polyline class="s2l" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="56.0,200.0 141.4,197.0 226.9,189.5 312.3,177.5 397.7,174.5 483.1,167.0 568.6,159.5 654.0,152.0"/>
-<circle class="s2 ring" stroke-width="2" cx="654.0" cy="152.0" r="4.5"/>
-<text class="value" x="664.0" y="88.5">93</text>
-<text class="value" x="664.0" y="156.0">48</text>
+<polyline class="s1l" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="56.0,126.5 130.8,126.5 205.5,116.0 280.2,108.5 355.0,101.0 429.8,92.0 504.5,87.5 579.2,84.5 654.0,81.5"/>
+<circle class="s1 ring" stroke-width="2" cx="654.0" cy="81.5" r="4.5"/>
+<polyline class="s2l" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="56.0,200.0 130.8,197.0 205.5,189.5 280.2,177.5 355.0,174.5 429.8,167.0 504.5,159.5 579.2,152.0 654.0,144.5"/>
+<circle class="s2 ring" stroke-width="2" cx="654.0" cy="144.5" r="4.5"/>
+<text class="value" x="664.0" y="85.5">95</text>
+<text class="value" x="664.0" y="148.5">53</text>
 <text class="tick" x="56.0" y="242" text-anchor="start">Nov 7</text>
-<text class="tick" x="654.0" y="242" text-anchor="end">Nov 14</text>
+<text class="tick" x="654.0" y="242" text-anchor="end">Nov 15</text>
 <text class="title" x="16" y="286">By release</text>
 <text class="sub" x="16" y="304">All-time downloads of each version's files. Before 0.4.0, updates counted as downloads</text>
 <line class="axis" x1="56" x2="724" y1="480.0" y2="480.0"/>
@@ -83,7 +83,7 @@
 <path class="s1" d="M604.8,480 V472.8 Q604.8,468.8 608.8,468.8 H618.8 Q622.8,468.8 622.8,472.8 V480 Z"><title>v0.7.2: 3 downloads</title></path>
 <path class="s2" d="M624.8,480 V431.5 Q624.8,427.5 628.8,427.5 H638.8 Q642.8,427.5 642.8,431.5 V480 Z"><title>v0.7.2: 14 in-app updates</title></path>
 <text class="tick" x="623.8" y="498" text-anchor="middle">0.7.2</text>
-<path class="s1" d="M671.6,480 V465.2 Q671.6,461.2 675.6,461.2 H685.6 Q689.6,461.2 689.6,465.2 V480 Z"><title>v0.7.3: 5 downloads</title></path>
-<path class="s2" d="M691.6,480 V457.8 Q691.6,453.8 695.6,453.8 H705.6 Q709.6,453.8 709.6,457.8 V480 Z"><title>v0.7.3: 7 in-app updates</title></path>
+<path class="s1" d="M671.6,480 V457.8 Q671.6,453.8 675.6,453.8 H685.6 Q689.6,453.8 689.6,457.8 V480 Z"><title>v0.7.3: 7 downloads</title></path>
+<path class="s2" d="M691.6,480 V439.0 Q691.6,435.0 695.6,435.0 H705.6 Q709.6,435.0 709.6,439.0 V480 Z"><title>v0.7.3: 12 in-app updates</title></path>
 <text class="tick" x="690.6" y="498" text-anchor="middle">0.7.3</text>
 </svg>
