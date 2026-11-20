@@ -18,6 +18,25 @@ brew install --cask soleo/tap/tinycap
 
 Tinycap checks for updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`.
 
+Tinycap is also on the [Mac App Store](https://apps.apple.com/us/app/tinycap/id6828270481).
+
+### App Store or direct download?
+
+Both are free and do the same things: every recording, screenshot, editing and export feature is in both. They differ in how you install, update and save.
+
+| | Mac App Store | Direct download |
+| --- | --- | --- |
+| Price | Free | Free |
+| Features | All of them | All of them |
+| Version now | 0.7.2 | 0.7.3 |
+| New versions arrive | After Apple has reviewed them | The day they are released |
+| Updates | The App Store installs them | Tinycap checks once a day and offers them; you can turn the check off |
+| Network connections | None | GitHub only, to check for and download updates |
+| Where files are saved | A folder you choose the first time you save | Movies → Tinycap, until you choose another folder |
+| Install | From the App Store | Drag from the DMG, or use Homebrew |
+| Checked by Apple | App Review | Notarized |
+| Runs in the App Sandbox | Yes | Yes |
+
 ## Downloads
 
 <img src="https://raw.githubusercontent.com/soleo/tinycap/gh-pages/stats/downloads.svg" width="760" alt="Tinycap downloads: running totals since tracking started, and downloads and in-app updates per release">
