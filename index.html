@@ -28,7 +28,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=0.7.3">
+  <link rel="stylesheet" href="styles.css?v=0.7.3-1">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -70,7 +70,7 @@
         </a>
         <p class="fine">Version 0.7.3 (<a href="https://github.com/soleo/tinycap/releases/tag/v0.7.3">what's new</a>) · 6.8 MB · macOS 15 Sequoia or later · Apple Silicon and Intel<br>Signed and notarized by Apple. Updates itself. Free and open source (MIT).</p>
         <p class="fine brew">Or with Homebrew: <code>brew install --cask soleo/tap/tinycap</code></p>
-        <p class="fine brew">Also on the <a href="https://apps.apple.com/us/app/tinycap/id6828270481">Mac App Store</a>, currently version 0.7.2. The App Store keeps it up to date.</p>
+        <p class="fine brew">Also on the <a href="https://apps.apple.com/us/app/tinycap/id6828270481">Mac App Store</a>, currently version 0.7.2. <a href="#compare">Compare the two</a>.</p>
       </div>
 
       <figure class="demo" aria-label="Illustration: Tinycap's menu-bar menu and an area being selected">
@@ -250,6 +250,29 @@
 cd tinycap
 scripts/build-app.sh
 open build/Tinycap.app</code></pre>
+    </section>
+
+    <section id="compare" class="section">
+      <h2>App Store or direct download?</h2>
+      <p class="lead">Both are free and do the same things: every recording, screenshot, editing and export feature is in both. They differ in how you install, update and save.</p>
+      <table class="keys compare">
+        <caption class="visually-hidden">Differences between the Mac App Store version and the direct download</caption>
+        <thead>
+          <tr><td></td><th scope="col"><a href="https://apps.apple.com/us/app/tinycap/id6828270481">Mac App Store</a></th><th scope="col"><a href="https://github.com/soleo/tinycap/releases/download/v0.7.3/Tinycap-0.7.3.dmg">Direct download</a></th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Price</th><td>Free</td><td>Free</td></tr>
+          <tr><th scope="row">Features</th><td>All of them</td><td>All of them</td></tr>
+          <tr><th scope="row">Version now</th><td>0.7.2</td><td>0.7.3</td></tr>
+          <tr><th scope="row">New versions arrive</th><td>After Apple has reviewed them</td><td>The day they are released</td></tr>
+          <tr><th scope="row">Updates</th><td>The App Store installs them</td><td>Tinycap checks once a day and offers them; you can turn the check off</td></tr>
+          <tr><th scope="row">Network connections</th><td>None</td><td>GitHub only, to check for and download updates</td></tr>
+          <tr><th scope="row">Where files are saved</th><td>A folder you choose the first time you save</td><td>Movies → Tinycap, until you choose another folder</td></tr>
+          <tr><th scope="row">Install</th><td>From the App Store</td><td>Drag from the DMG, or use Homebrew</td></tr>
+          <tr><th scope="row">Checked by Apple</th><td>App Review</td><td>Notarized</td></tr>
+          <tr><th scope="row">Runs in the App Sandbox</th><td>Yes</td><td>Yes</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section class="section final">

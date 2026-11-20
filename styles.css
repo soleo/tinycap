@@ -212,6 +212,12 @@ h1 { font-size: clamp(36px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.
 .keys tr:last-child th, .keys tr:last-child td { border-bottom: 0; }
 .keys th { font-weight: 600; }
 .keys td { text-align: right; }
+.compare { table-layout: fixed; }
+.compare td { text-align: left; vertical-align: top; }
+.compare th { vertical-align: top; }
+.compare thead th { font-weight: 820; background: var(--tile); }
+.compare thead td { background: var(--tile); }
+.compare tbody td { color: var(--ink-soft); }
 kbd {
   font: 600 15px var(--mono); padding: 3px 8px; border-radius: 6px;
   background: var(--tile); border: 1px solid var(--line); box-shadow: inset -1px -2px 0 var(--lo);
@@ -246,6 +252,7 @@ kbd {
   .grid, .steps { grid-template-columns: 1fr; }
   .compact-hide { display: none; }
   .lead { font-size: 18px; }
+  .compare th, .compare td { padding: 10px 10px; font-size: 14px; overflow-wrap: anywhere; }
   .menu { right: 10px; width: 190px; }
   .menu-item { font-size: 11px; padding: 1.5px 8px; }
   .bar { left: 4%; gap: 5px; font-size: 11px; }
